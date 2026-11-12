@@ -437,14 +437,6 @@ class LyricsWindow(QWidget):
         self.btn_lock.clicked.connect(lambda: self.toggle_lock())
         header_layout.addWidget(self.btn_lock)
 
-        self.opacity_slider = QSlider(Qt.Horizontal, self.header_bar)
-        self.opacity_slider.setRange(30, 100)
-        self.opacity_slider.setValue(100)
-        self.opacity_slider.setFixedWidth(65)
-        self.opacity_slider.setToolTip("Window Opacity (30% - 100%)")
-        self.opacity_slider.valueChanged.connect(self._on_opacity_changed)
-        header_layout.addWidget(self.opacity_slider)
-
         self.btn_bubble = QPushButton("🫧", self.header_bar)
         self.btn_bubble.setToolTip("Collapse into Floating Bubble (Ctrl+M)")
         self.btn_bubble.setFixedWidth(24)
@@ -452,9 +444,9 @@ class LyricsWindow(QWidget):
         header_layout.addWidget(self.btn_bubble)
 
         self.btn_minimize = QPushButton("—", self.header_bar)
-        self.btn_minimize.setToolTip("Minimize (Ctrl+N)")
+        self.btn_minimize.setToolTip("Minimize to Tray (Ctrl+N)")
         self.btn_minimize.setFixedWidth(24)
-        self.btn_minimize.clicked.connect(self.showMinimized)
+        self.btn_minimize.clicked.connect(self.minimize_to_tray)
         header_layout.addWidget(self.btn_minimize)
 
         self.btn_close = QPushButton("✕", self.header_bar)
@@ -511,9 +503,13 @@ class LyricsWindow(QWidget):
         self.action_bubble.triggered.connect(self.toggle_bubble)
         tray_menu.addAction(self.action_bubble)
 
-        self.action_minimize = QAction("Minimize", self)
-        self.action_minimize.triggered.connect(self.showMinimized)
+        self.action_minimize = QAction("Minimize to Tray", self)
+        self.action_minimize.triggered.connect(self.minimize_to_tray)
         tray_menu.addAction(self.action_minimize)
+
+        self.action_restore = QAction("Restore Window", self)
+        self.action_restore.triggered.connect(self.restore_from_tray)
+        tray_menu.addAction(self.action_restore)
 
         tray_menu.addSeparator()
 
@@ -533,7 +529,7 @@ class LyricsWindow(QWidget):
         self.bubble_shortcut = QShortcut(QKeySequence("Ctrl+M"), self)
         self.bubble_shortcut.activated.connect(self.toggle_bubble)
         self.minimize_shortcut = QShortcut(QKeySequence("Ctrl+N"), self)
-        self.minimize_shortcut.activated.connect(self.showMinimized)
+        self.minimize_shortcut.activated.connect(self.minimize_to_tray)
         self.quit_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self)
         self.quit_shortcut.activated.connect(self.quit_app)
         self.sub_offset_shortcut = QShortcut(QKeySequence("["), self)
@@ -541,12 +537,14 @@ class LyricsWindow(QWidget):
         self.add_offset_shortcut = QShortcut(QKeySequence("]"), self)
         self.add_offset_shortcut.activated.connect(lambda: self.adjust_offset(500))
 
-    def _on_opacity_changed(self, value: int) -> None:
-        self.setWindowOpacity(value / 100.0)
-
     def _on_tray_activated(self, reason: QSystemTrayIcon.ActivationReason) -> None:
         if reason == QSystemTrayIcon.Trigger:
-            self.toggle_lock()
+            if self.isHidden():
+                self.restore_from_tray()
+            elif self._is_locked:
+                self.toggle_lock(False)
+            else:
+                self.toggle_lock()
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
@@ -594,7 +592,7 @@ class LyricsWindow(QWidget):
         super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:
-        if not self._is_locked and not self.opacity_slider.isSliderDown():
+        if not self._is_locked:
             self.header_bar.hide()
             self._header_timer.stop()
         super().leaveEvent(event)
@@ -605,10 +603,6 @@ class LyricsWindow(QWidget):
         self._header_timer.start(2000)
 
     def _on_header_timer_timeout(self) -> None:
-        if self.opacity_slider.isSliderDown():
-            self._header_timer.start(2000)
-            return
-
         # Auto-hide if mouse has left the window or is idle
         if not self.rect().contains(self.mapFromGlobal(self.cursor().pos())):
             self.header_bar.hide()
@@ -670,22 +664,6 @@ class LyricsWindow(QWidget):
             }}
             QPushButton:pressed {{
                 background-color: rgba(255, 255, 255, 70);
-            }}
-            QSlider::groove:horizontal {{
-                height: 4px;
-                background: rgba(255, 255, 255, 40);
-                border-radius: 2px;
-            }}
-            QSlider::sub-page:horizontal {{
-                background: #1DB954;
-                border-radius: 2px;
-            }}
-            QSlider::handle:horizontal {{
-                background: #FFFFFF;
-                width: 10px;
-                margin-top: -3px;
-                margin-bottom: -3px;
-                border-radius: 5px;
             }}
         """)
 
@@ -750,6 +728,27 @@ class LyricsWindow(QWidget):
             self.collapse_to_bubble()
         else:
             self.expand_from_bubble()
+
+    def minimize_to_tray(self) -> None:
+        """Minimize window directly to system tray."""
+        if hasattr(self, "bubble"):
+            self.bubble.hide()
+        self.hide()
+        if self.tray_icon and self.tray_icon.isVisible():
+            self.tray_icon.showMessage(
+                "MiniLyrics Minimized",
+                "App is running in the system tray. Click the tray icon to restore.",
+                QSystemTrayIcon.Information,
+                1500,
+            )
+
+    def restore_from_tray(self) -> None:
+        """Restore window from system tray."""
+        if hasattr(self, "bubble"):
+            self.bubble.hide()
+        self.show()
+        self.raise_()
+        self.activateWindow()
 
     def quit_app(self) -> None:
         """Kill the process and cleanly exit the application."""

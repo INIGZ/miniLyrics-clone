@@ -15,7 +15,6 @@ A lightweight, modern MiniLyrics clone for Spotify Web Player ([open.spotify.com
 - **Instant Sync with open.spotify.com via WebSocket**: Dedicated background asyncio server on port `8765` receives real-time track metadata and playback position updates from Spotify Web Player.
 - **Automatic Synced Lyrics via LRCLIB with Offline Caching**: Fetches synced `.lrc` lyrics from the open LRCLIB database (exact matching with search fallback). Downloaded lyrics are cached locally to `.cache/lyrics/` as JSON for instant offline playback.
 - **Manual Offset Calibration (`[-0.5s]`, `[+0.5s]`, `[` and `]` hotkeys)**: Fine-tune synchronization on the fly by +/- 500ms increments to compensate for audio latency or live versions.
-- **Opacity Adjustment Slider**: Header slider allows effortless transparency adjustments between 30% and 100%.
 - **Built-in Visual Demo Mode (`python main.py --demo`)**: Immediately previews UI styling, lyrics synchronization, and smooth scrolling using Queen's *Bohemian Rhapsody* without launching a browser or logging into Spotify.
 - **Standalone Mock Playback Simulator (`python -m src.simulator.mock_spotify`)**: CLI playback engine to simulate Spotify track transitions, seeking, and playback events over WebSocket.
 
@@ -154,17 +153,16 @@ python -m src.simulator.mock_spotify --test
 | Action | Control / Hotkey | Description |
 |---|---|---|
 | **Collapse to Bubble** | `Ctrl + M` / Header `🫧` | Collapses overlay into a compact floating bubble. Click bubble or press `Ctrl+M` to expand. |
-| **Minimize** | `Ctrl + N` / Header `—` | Minimizes window to taskbar/tray. |
+| **Minimize to Tray** | `Ctrl + N` / Header `—` | Hides window to the system tray. Click the tray icon to restore. |
 | **Exit Process** | `Ctrl + Q` / Header `✕` | Immediately kills the process and terminates the application cleanly. |
 | **Click-Through / Lock** | `Ctrl + L` / Header `🔒 Lock` | Toggles input transparency. Clicks pass through to desktop/apps behind. |
-| **Unlock Window** | **System Tray Icon Click** | Restores normal window input when click-through mode is active. |
+| **Restore / Unlock** | **System Tray Icon Click** | Restores window when hidden in tray, or unlocks click-through mode. |
 | **Transparent Background** | `Ctrl + B` / Header `🎨 Clear` | Toggles background container between dark glass and 100% transparent (text-only). |
 | **Move Overlay** | Left-click + Drag | Drag window anywhere on screen (header bar or background). |
 | **Resize Overlay** | Bottom-Right Grip | Drag size grip to scale window; text size dynamically adapts. |
 | **Decrease Offset** | `[` or `[-0.5s]` button | Adjusts lyric timing by -500ms (lyrics display earlier). |
 | **Increase Offset** | `]` or `[+0.5s]` button | Adjusts lyric timing by +500ms (lyrics display later). |
 | **Reset Offset** | System Tray Menu | Resets manual offset calibration back to `+0.0s`. |
-| **Opacity Slider** | Header Horizontal Slider | Adjusts window opacity continuously from 30% to 100%. |
 
 ---
 

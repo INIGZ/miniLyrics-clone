@@ -121,10 +121,18 @@ def test_lyrics_loading_and_scrolling(qapp):
     win.close()
 
 
-def test_opacity_slider(qapp):
+def test_minimize_to_tray(qapp):
     win = LyricsWindow()
-    win.opacity_slider.setValue(80)
-    assert round(win.windowOpacity(), 2) == 0.8
+    win.show()
+    assert win.isVisible()
+
+    # Minimize to tray
+    win.minimize_to_tray()
+    assert win.isHidden()
+
+    # Restore from tray
+    win.restore_from_tray()
+    assert win.isVisible()
     win.close()
 
 
