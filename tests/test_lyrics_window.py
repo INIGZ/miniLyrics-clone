@@ -338,3 +338,36 @@ def test_remember_and_restore_window_position(tmp_path, qapp):
     assert win2._transparent_bg
     win2.close()
 
+
+def test_demo_mode_media_controls(qapp):
+    win = LyricsWindow(state_path=False)
+    from main import DemoRunner
+    runner = DemoRunner(win)
+    win.demo_runner = runner
+    runner.start()
+
+    assert runner.timer.isActive()
+    assert not win._is_paused
+
+    # Toggle pause via send_command
+    win.send_command("play_pause")
+    assert not runner.timer.isActive()
+    assert win._is_paused
+
+    # Toggle play back on
+    win.send_command("play_pause")
+    assert runner.timer.isActive()
+    assert not win._is_paused
+
+    # Skip next (+15s)
+    pos_before = runner.position
+    win.send_command("next")
+    assert runner.position == pos_before + 15.0
+
+    # Skip prev (-15s)
+    win.send_command("prev")
+    assert runner.position == pos_before
+
+    runner.timer.stop()
+    win.close()
+

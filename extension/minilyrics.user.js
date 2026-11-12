@@ -345,28 +345,167 @@
     }
   }
 
-  function executeSpotifyCommand(cmd) {
-    if (!cmd || !cmd.action) return;
+  function robustClick(elem) {
+    if (!elem) return false;
+    try {
+      elem.focus();
+    } catch (_) {}
+
+    const mouseOpts = { bubbles: true, cancelable: true, view: window, buttons: 1, detail: 1 };
+    try {
+      elem.dispatchEvent(new PointerEvent("pointerdown", mouseOpts));
+      elem.dispatchEvent(new MouseEvent("mousedown", mouseOpts));
+      elem.dispatchEvent(new PointerEvent("pointerup", mouseOpts));
+      elem.dispatchEvent(new MouseEvent("mouseup", mouseOpts));
+      elem.dispatchEvent(new MouseEvent("click", mouseOpts));
+    } catch (_) {}
+
+    try {
+      elem.click();
+    } catch (_) {}
+
+    return true;
+  }
+
+  function togglePlayPause() {
+    const doc = (typeof unsafeWindow !== "undefined" && unsafeWindow.document) ? unsafeWindow.document : document;
+    const selectors = [
+      '[data-testid="control-button-playpause"]',
+      '[data-testid="play-button"]',
+      '[data-testid="player-controls"] button[data-testid*="play" i]',
+      '[data-testid="player-controls"] button[data-testid*="pause" i]',
+      'button[aria-label="Play"]',
+      'button[aria-label="Pause"]',
+      'button[aria-label="Reproducir"]',
+      'button[aria-label="Pausar"]',
+      '[data-testid="player-controls"] button[aria-label*="Play" i]',
+      '[data-testid="player-controls"] button[aria-label*="Pause" i]',
+      '[data-testid="player-controls"] button[aria-label*="Reproducir" i]',
+      '[data-testid="player-controls"] button[aria-label*="Pausar" i]',
+      'footer button[aria-label*="Play" i]',
+      'footer button[aria-label*="Pause" i]',
+      'footer button[aria-label*="Reproducir" i]',
+      'footer button[aria-label*="Pausar" i]',
+    ];
+
+    for (const sel of selectors) {
+      const btn = doc.querySelector(sel);
+      if (btn) {
+        console.log("[MiniLyrics] Triggering play/pause on:", sel);
+        robustClick(btn);
+        return true;
+      }
+    }
+
+    const controls = doc.querySelector('[data-testid="player-controls"], .player-controls');
+    if (controls) {
+      const buttons = controls.querySelectorAll("button");
+      if (buttons.length >= 3) {
+        const centerBtn = buttons[Math.floor(buttons.length / 2)];
+        console.log("[MiniLyrics] Clicking center player-controls button");
+        robustClick(centerBtn);
+        return true;
+      }
+    }
+
     const audio = getAudioElement();
+    if (audio) {
+      console.log("[MiniLyrics] Toggling HTML5 audio directly");
+      if (audio.paused) {
+        audio.play().catch(() => {});
+      } else {
+        audio.pause();
+      }
+      return true;
+    }
+
+    const spaceOpts = { key: " ", code: "Space", keyCode: 32, which: 32, bubbles: true, cancelable: true };
+    doc.body.dispatchEvent(new KeyboardEvent("keydown", spaceOpts));
+    doc.body.dispatchEvent(new KeyboardEvent("keyup", spaceOpts));
+    return true;
+  }
+
+  function skipNext() {
+    const doc = (typeof unsafeWindow !== "undefined" && unsafeWindow.document) ? unsafeWindow.document : document;
+    const selectors = [
+      '[data-testid="control-button-skip-forward"]',
+      '[data-testid="skip-forward-button"]',
+      'button[aria-label*="Next" i]',
+      'button[aria-label*="Siguiente" i]',
+      'button[aria-label*="Suivant" i]',
+      '[data-testid="player-controls"] button[aria-label*="Next" i]',
+      'footer button[aria-label*="Next" i]',
+    ];
+
+    for (const sel of selectors) {
+      const btn = doc.querySelector(sel);
+      if (btn) {
+        console.log("[MiniLyrics] Triggering skip-forward on:", sel);
+        robustClick(btn);
+        return true;
+      }
+    }
+
+    const controls = doc.querySelector('[data-testid="player-controls"], .player-controls');
+    if (controls) {
+      const buttons = controls.querySelectorAll("button");
+      if (buttons.length >= 4) {
+        const nextBtn = buttons[Math.floor(buttons.length / 2) + 1];
+        robustClick(nextBtn);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function skipPrev() {
+    const doc = (typeof unsafeWindow !== "undefined" && unsafeWindow.document) ? unsafeWindow.document : document;
+    const selectors = [
+      '[data-testid="control-button-skip-back"]',
+      '[data-testid="skip-back-button"]',
+      'button[aria-label*="Previous" i]',
+      'button[aria-label*="Anterior" i]',
+      'button[aria-label*="Précédent" i]',
+      '[data-testid="player-controls"] button[aria-label*="Previous" i]',
+      'footer button[aria-label*="Previous" i]',
+    ];
+
+    for (const sel of selectors) {
+      const btn = doc.querySelector(sel);
+      if (btn) {
+        console.log("[MiniLyrics] Triggering skip-back on:", sel);
+        robustClick(btn);
+        return true;
+      }
+    }
+
+    const controls = doc.querySelector('[data-testid="player-controls"], .player-controls');
+    if (controls) {
+      const buttons = controls.querySelectorAll("button");
+      if (buttons.length >= 3) {
+        const prevBtn = buttons[Math.floor(buttons.length / 2) - 1];
+        robustClick(prevBtn);
+        return true;
+      }
+    }
+    return false;
+  }
+
+  function executeSpotifyCommand(cmd) {
+    console.log("[MiniLyrics] Received command:", cmd);
+    if (!cmd || !cmd.action) return;
 
     switch (cmd.action) {
       case "play_pause": {
-        const btn = document.querySelector('[data-testid="control-button-playpause"]');
-        if (btn) {
-          btn.click();
-        } else if (audio) {
-          audio.paused ? audio.play() : audio.pause();
-        }
+        togglePlayPause();
         break;
       }
       case "next": {
-        const btn = document.querySelector('[data-testid="control-button-skip-forward"]');
-        if (btn) btn.click();
+        skipNext();
         break;
       }
       case "prev": {
-        const btn = document.querySelector('[data-testid="control-button-skip-back"]');
-        if (btn) btn.click();
+        skipPrev();
         break;
       }
       case "seek": {
@@ -379,6 +518,8 @@
   }
 
   function seekSpotify(targetSeconds) {
+    const doc = (typeof unsafeWindow !== "undefined" && unsafeWindow.document) ? unsafeWindow.document : document;
+    console.log("[MiniLyrics] Seeking to:", targetSeconds);
     const audio = getAudioElement();
     if (audio && Number.isFinite(audio.duration) && audio.duration > 0) {
       try {
@@ -386,8 +527,10 @@
       } catch (_) {}
     }
 
-    const bar = document.querySelector('[data-testid="playback-progressbar"], [data-testid="progress-bar"]');
-    const durElem = document.querySelector('[data-testid="playback-duration"]');
+    const bar = doc.querySelector(
+      '[data-testid="playback-progressbar"], [data-testid="progress-bar"], .playback-progressbar'
+    );
+    const durElem = doc.querySelector('[data-testid="playback-duration"]');
     const totalDuration = durElem ? parseTime(durElem.textContent.trim()) : (audio?.duration || 0);
 
     if (bar && totalDuration > 0) {
@@ -395,8 +538,10 @@
       const ratio = Math.max(0, Math.min(1, targetSeconds / totalDuration));
       const clickX = rect.left + rect.width * ratio;
       const clickY = rect.top + rect.height / 2;
-      const opts = { bubbles: true, cancelable: true, clientX: clickX, clientY: clickY };
+      const opts = { bubbles: true, cancelable: true, view: window, clientX: clickX, clientY: clickY, button: 0 };
+      bar.dispatchEvent(new PointerEvent("pointerdown", opts));
       bar.dispatchEvent(new MouseEvent("mousedown", opts));
+      bar.dispatchEvent(new PointerEvent("pointerup", opts));
       bar.dispatchEvent(new MouseEvent("mouseup", opts));
       bar.dispatchEvent(new MouseEvent("click", opts));
     }

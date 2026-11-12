@@ -870,7 +870,10 @@ class LyricsWindow(QWidget):
 
     # Bubble collapse & expand
     def send_command(self, action: str, **kwargs: Any) -> None:
-        """Send a playback control command (play_pause, next, prev, seek) to Spotify Web."""
+        """Send a playback control command (play_pause, next, prev, seek) to Spotify Web or demo runner."""
+        logger.info("Executing playback command: %s %s", action, kwargs)
+        if hasattr(self, "demo_runner") and self.demo_runner:
+            self.demo_runner.handle_command(action, **kwargs)
         if self.ws_server and hasattr(self.ws_server, "send_command"):
             self.ws_server.send_command(action, **kwargs)
 

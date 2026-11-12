@@ -85,8 +85,8 @@ class DemoRunner:
 
     def start(self) -> None:
         self.window.load_lyrics_direct(DEMO_LRC, title="Bohemian Rhapsody", artist="Queen")
-        self._emit()
         self.timer.start()
+        self._emit()
 
     def _tick(self) -> None:
         self.position += self.step
@@ -102,8 +102,26 @@ class DemoRunner:
             "album": "A Night at the Opera",
             "duration": self.duration,
             "position": round(self.position, 2),
-            "isPaused": False,
+            "isPaused": not self.timer.isActive(),
         })
+
+    def handle_command(self, action: str, **kwargs: Any) -> None:
+        if action == "play_pause":
+            if self.timer.isActive():
+                self.timer.stop()
+            else:
+                self.timer.start()
+            self._emit()
+        elif action == "next":
+            self.position = min(self.position + 15.0, self.duration)
+            self._emit()
+        elif action == "prev":
+            self.position = max(0.0, self.position - 15.0)
+            self._emit()
+        elif action == "seek":
+            if "position" in kwargs:
+                self.position = float(kwargs["position"])
+                self._emit()
 
 
 def main(argv: list[str] | None = None) -> int:
@@ -138,6 +156,7 @@ def main(argv: list[str] | None = None) -> int:
     demo_runner: DemoRunner | None = None
     if args.demo:
         demo_runner = DemoRunner(window)
+        window.demo_runner = demo_runner
         demo_runner.start()
 
     window.show()
