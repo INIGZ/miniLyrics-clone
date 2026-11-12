@@ -313,5 +313,28 @@ def test_glass_mode_crystal_header_and_focus(qapp):
     assert not win.header_bar.isHidden()
     assert win.header_bar.isVisible()
     win.close()
-    win.close()
+
+
+def test_remember_and_restore_window_position(tmp_path, qapp):
+    state_file = tmp_path / "window_state.json"
+
+    # Create window at custom position and size
+    win1 = LyricsWindow(state_path=state_file)
+    win1.show()
+    win1.move(234, 156)
+    win1.resize(480, 110)
+    win1.set_transparent_background(True)
+    win1._save_geometry_state()
+    win1.close()
+
+    assert state_file.exists()
+
+    # Reopen window: should restore saved geometry
+    win2 = LyricsWindow(state_path=state_file)
+    assert win2.x() == 234
+    assert win2.y() == 156
+    assert win2.width() == 480
+    assert win2.height() == 110
+    assert win2._transparent_bg
+    win2.close()
 

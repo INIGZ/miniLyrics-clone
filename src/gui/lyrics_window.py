@@ -6,7 +6,9 @@ and LRCLib integration.
 
 from __future__ import annotations
 
+import json
 import logging
+from pathlib import Path
 import threading
 import time
 from typing import Any
@@ -223,9 +225,9 @@ class LyricsDisplay(QWidget):
             painter.setFont(self.font_normal)
             status_text = self.status_text or "Waiting for Spotify playback..."
             status_rect = QRectF(16, 0, w - 32, h)
-            # Crisp black outline around status text
-            painter.setPen(QColor(0, 0, 0, 255))
-            for dx, dy in ((-1.5, 0), (1.5, 0), (0, -1.5), (0, 1.5), (-1.2, -1.2), (1.2, -1.2), (-1.2, 1.2), (1.2, 1.2)):
+            # Thin hairline outline around status text
+            painter.setPen(QColor(0, 0, 0, 220))
+            for dx, dy in ((-0.75, 0), (0.75, 0), (0, -0.75), (0, 0.75)):
                 painter.drawText(status_rect.translated(dx, dy), Qt.AlignCenter | Qt.TextWordWrap, status_text)
             painter.setPen(QColor(255, 255, 255, 220))
             painter.drawText(status_rect, Qt.AlignCenter | Qt.TextWordWrap, status_text)
@@ -264,9 +266,9 @@ class LyricsDisplay(QWidget):
             for s_idx, s_text in enumerate(sublines):
                 sub_rect = QRectF(20, start_y + s_idx * step_h, content_w, step_h)
 
-                # Draw crisp black outline around glyphs
-                painter.setPen(QColor(0, 0, 0, 255))
-                for dx, dy in ((-1.5, 0), (1.5, 0), (0, -1.5), (0, 1.5), (-1.2, -1.2), (1.2, -1.2), (-1.2, 1.2), (1.2, 1.2)):
+                # Draw thin hairline black outline around glyphs
+                painter.setPen(QColor(0, 0, 0, 220))
+                for dx, dy in ((-0.75, 0), (0.75, 0), (0, -0.75), (0, 0.75)):
                     painter.drawText(sub_rect.translated(dx, dy), Qt.AlignCenter | Qt.TextSingleLine, s_text)
 
                 # Draw main text in center
@@ -348,6 +350,7 @@ class LyricsWindow(QWidget):
         ws_server: Any = None,
         always_on_top: bool = True,
         transparent_bg: bool = False,
+        state_path: Path | bool | None = None,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
@@ -355,6 +358,7 @@ class LyricsWindow(QWidget):
         self.ws_server = ws_server
         self._always_on_top = always_on_top
         self._transparent_bg = transparent_bg
+        self.state_path = Path(".cache/window_state.json") if state_path is None else (state_path if isinstance(state_path, Path) else None)
         self._is_locked = False
         self._drag_pos: QPoint | None = None
 
@@ -384,6 +388,7 @@ class LyricsWindow(QWidget):
         self.setMouseTracking(True)
         self.resize(510, 120)
         self.setMinimumSize(280, 70)
+        self._restore_saved_geometry()
 
         self._init_ui()
         self._init_tray()
@@ -628,6 +633,57 @@ class LyricsWindow(QWidget):
                 self.height() - self.size_grip.height() - 4,
             )
             self.size_grip.raise_()
+        self._save_geometry_state()
+
+    def moveEvent(self, event) -> None:
+        super().moveEvent(event)
+        self._save_geometry_state()
+
+    def closeEvent(self, event) -> None:
+        self._save_geometry_state()
+        super().closeEvent(event)
+
+    def _restore_saved_geometry(self) -> None:
+        if not self.state_path or not isinstance(self.state_path, Path) or not self.state_path.exists():
+            return
+        try:
+            with open(self.state_path, "r", encoding="utf-8") as f:
+                state = json.load(f)
+            if not isinstance(state, dict):
+                return
+
+            w = state.get("width")
+            h = state.get("height")
+            if isinstance(w, (int, float)) and isinstance(h, (int, float)):
+                self.resize(max(280, int(w)), max(70, int(h)))
+
+            x = state.get("x")
+            y = state.get("y")
+            if isinstance(x, (int, float)) and isinstance(y, (int, float)):
+                self.move(int(x), int(y))
+
+            if "transparent_bg" in state and not self._transparent_bg:
+                self._transparent_bg = bool(state["transparent_bg"])
+        except Exception as e:
+            logger.debug("Failed to restore window state: %s", e)
+
+    def _save_geometry_state(self) -> None:
+        if not self.state_path or not isinstance(self.state_path, Path):
+            return
+        if self.isVisible() and not self.isMinimized():
+            try:
+                self.state_path.parent.mkdir(parents=True, exist_ok=True)
+                state = {
+                    "x": self.x(),
+                    "y": self.y(),
+                    "width": self.width(),
+                    "height": self.height(),
+                    "transparent_bg": self._transparent_bg,
+                }
+                with open(self.state_path, "w", encoding="utf-8") as f:
+                    json.dump(state, f, indent=2)
+            except Exception as e:
+                logger.debug("Failed to save window state: %s", e)
 
     # Drag and movement handling
     def start_drag(self, event) -> None:
@@ -644,6 +700,7 @@ class LyricsWindow(QWidget):
 
     def end_drag(self, event) -> None:
         self._drag_pos = None
+        self._save_geometry_state()
 
     def mousePressEvent(self, event) -> None:
         self.start_drag(event)
@@ -867,6 +924,7 @@ class LyricsWindow(QWidget):
 
     def quit_app(self) -> None:
         """Kill the process and cleanly exit the application."""
+        self._save_geometry_state()
         if hasattr(self, "bubble"):
             self.bubble.hide()
         if hasattr(self, "tray_icon") and self.tray_icon:

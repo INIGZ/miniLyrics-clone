@@ -6,9 +6,10 @@ A lightweight, modern MiniLyrics clone for Spotify Web Player ([open.spotify.com
 
 ## Features
 
+- **Remembers Window Position & Size**: Automatically remembers your preferred screen location, dimensions, and background transparency mode across app restarts (`.cache/window_state.json`).
 - **Compact & Floating (510×120 Default Size)**: 50% shorter height and 75% width by default for a sleek, unobtrusive desktop strip that floats above all apps.
 - **2-Row Crystal Header Bar (Focus-Revealed)**: In Glass mode, the header is organized into two clean rows (Row 1: Track title & window actions; Row 2: Playback controls & timing offset) with an opaque beveled crystal glass gradient that reveals on focus or hover.
-- **Crisp Black Font Outline**: Replaces directional drop shadow with a solid 360-degree black outline around every lyric character, guaranteeing high-contrast readability over bright or dark wallpapers in transparent mode.
+- **Delicate Hairline Black Font Outline**: Ultra-thin contour border around every lyric character that preserves font elegance while guaranteeing sharp contrast over any background wallpaper.
 - **Transparent, Borderless, Always-on-Top Desktop Overlay**: Floats unobtrusively above all applications with a translucent dark backdrop, rounded corners, and smooth typography.
 - **Full Playback Control of Spotify Web**: Control Spotify directly from the overlay via header buttons (`⏮`, `⏯`, `⏭`), keyboard shortcuts (`Space`, `Ctrl+Left`, `Ctrl+Right`), or tray menu.
 - **Click-to-Seek Any Verse**: Left-click any lyric line in the window to instantly jump Spotify Web Player playback to that exact timestamp!
@@ -177,7 +178,7 @@ python -m src.simulator.mock_spotify --test
 
 ## Testing
 
-Run the automated pytest suite (48 unit tests covering parsing, caching, GUI state, crystal header, bubble collapse, and bidirectional WebSockets):
+Run the automated pytest suite (49 unit tests covering parsing, caching, GUI state, window persistence, crystal header, bubble collapse, and bidirectional WebSockets):
 
 ```bash
 pytest -v
