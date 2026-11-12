@@ -285,7 +285,12 @@ def test_window_controls_present(qapp):
     assert win.btn_bubble is not None
     assert win.btn_minimize is not None
     assert win.btn_close is not None
+    assert win.btn_prev is not None
+    assert win.btn_play_pause is not None
+    assert win.btn_next is not None
     assert win.btn_bubble.text() == "🫧"
     assert win.btn_minimize.text() == "—"
+    assert win.btn_play_pause.text() == "⏯"
+    win.close()
     win.close()
 

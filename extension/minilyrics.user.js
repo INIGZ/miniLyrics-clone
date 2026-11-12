@@ -345,6 +345,63 @@
     }
   }
 
+  function executeSpotifyCommand(cmd) {
+    if (!cmd || !cmd.action) return;
+    const audio = getAudioElement();
+
+    switch (cmd.action) {
+      case "play_pause": {
+        const btn = document.querySelector('[data-testid="control-button-playpause"]');
+        if (btn) {
+          btn.click();
+        } else if (audio) {
+          audio.paused ? audio.play() : audio.pause();
+        }
+        break;
+      }
+      case "next": {
+        const btn = document.querySelector('[data-testid="control-button-skip-forward"]');
+        if (btn) btn.click();
+        break;
+      }
+      case "prev": {
+        const btn = document.querySelector('[data-testid="control-button-skip-back"]');
+        if (btn) btn.click();
+        break;
+      }
+      case "seek": {
+        if (typeof cmd.position === "number") {
+          seekSpotify(cmd.position);
+        }
+        break;
+      }
+    }
+  }
+
+  function seekSpotify(targetSeconds) {
+    const audio = getAudioElement();
+    if (audio && Number.isFinite(audio.duration) && audio.duration > 0) {
+      try {
+        audio.currentTime = targetSeconds;
+      } catch (_) {}
+    }
+
+    const bar = document.querySelector('[data-testid="playback-progressbar"], [data-testid="progress-bar"]');
+    const durElem = document.querySelector('[data-testid="playback-duration"]');
+    const totalDuration = durElem ? parseTime(durElem.textContent.trim()) : (audio?.duration || 0);
+
+    if (bar && totalDuration > 0) {
+      const rect = bar.getBoundingClientRect();
+      const ratio = Math.max(0, Math.min(1, targetSeconds / totalDuration));
+      const clickX = rect.left + rect.width * ratio;
+      const clickY = rect.top + rect.height / 2;
+      const opts = { bubbles: true, cancelable: true, clientX: clickX, clientY: clickY };
+      bar.dispatchEvent(new MouseEvent("mousedown", opts));
+      bar.dispatchEvent(new MouseEvent("mouseup", opts));
+      bar.dispatchEvent(new MouseEvent("click", opts));
+    }
+  }
+
   function connect() {
     if (reconnectTimer) {
       clearTimeout(reconnectTimer);
@@ -372,6 +429,15 @@
       updateBadge(true);
       const current = scrapePlaybackState();
       sendPlaybackUpdate(current);
+    };
+
+    ws.onmessage = (event) => {
+      try {
+        const data = JSON.parse(event.data);
+        if (data && data.type === "command") {
+          executeSpotifyCommand(data);
+        }
+      } catch (_) {}
     };
 
     ws.onclose = () => {

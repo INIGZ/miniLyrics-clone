@@ -7,6 +7,8 @@ A lightweight, modern MiniLyrics clone for Spotify Web Player ([open.spotify.com
 ## Features
 
 - **Transparent, Borderless, Always-on-Top Desktop Overlay**: Floats unobtrusively above all applications with a translucent dark backdrop, rounded corners, and smooth typography.
+- **Full Playback Control of Spotify Web**: Control Spotify directly from the overlay via header buttons (`⏮`, `⏯`, `⏭`), keyboard shortcuts (`Space`, `Ctrl+Left`, `Ctrl+Right`), or tray menu.
+- **Click-to-Seek Any Verse**: Left-click any lyric line in the window to instantly jump Spotify Web Player playback to that exact timestamp!
 - **Transparent Background (Text Only Mode)**: Toggle between sleek dark frosted glass and 100% transparent background (`Ctrl+B` or header `🎨 Clear` button) so *only the lyrics text floats directly on your screen* with a subtle text shadow for readability over any light or dark background.
 - **Full Word-Wrapping Support**: Automatically wraps long lines across multiple lines with dynamic height allocation so lyrics are never truncated or cut off horizontally.
 - **Resizable Window with Adaptive Font Sizing**: Scale the overlay to any size (small widget or large display); font size smoothly adapts to window dimensions automatically.
@@ -152,6 +154,10 @@ python -m src.simulator.mock_spotify --test
 
 | Action | Control / Hotkey | Description |
 |---|---|---|
+| **Play / Pause** | `Space` / Header `⏯` | Toggles play/pause in Spotify Web Player. |
+| **Next Track** | `Ctrl + Right` / Header `⏭` | Skips to the next track in Spotify Web Player. |
+| **Previous Track** | `Ctrl + Left` / Header `⏮` | Returns to the previous track in Spotify Web Player. |
+| **Click-to-Seek** | Click any lyric line | Jumps Spotify playback directly to the clicked lyric timestamp. |
 | **Collapse to Bubble** | `Ctrl + M` / Header `🫧` | Collapses overlay into a compact floating bubble. Click bubble or press `Ctrl+M` to expand. |
 | **Minimize to Tray** | `Ctrl + N` / Header `—` | Hides window to the system tray. Click the tray icon to restore. |
 | **Exit Process** | `Ctrl + Q` / Header `✕` | Immediately kills the process and terminates the application cleanly. |
@@ -168,7 +174,7 @@ python -m src.simulator.mock_spotify --test
 
 ## Testing
 
-Run the automated pytest suite (46 unit tests covering parsing, caching, GUI state, bubble collapse, and WebSockets):
+Run the automated pytest suite (47 unit tests covering parsing, caching, GUI state, bubble collapse, and bidirectional WebSockets):
 
 ```bash
 pytest -v

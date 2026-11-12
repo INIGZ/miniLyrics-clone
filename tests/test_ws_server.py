@@ -63,3 +63,31 @@ def test_ws_server_receives_playback_payload(qapp):
     assert received_payloads[0]["title"] == "Bohemian Rhapsody"
     assert received_payloads[0]["artist"] == "Queen"
     assert received_payloads[0]["position"] == 42.0
+
+
+def test_ws_server_sends_command_to_connected_client(qapp):
+    port = 9879
+    server = WebSocketServer(host="127.0.0.1", port=port)
+    server.start()
+    time.sleep(0.15)
+
+    received_commands = []
+
+    async def client_listener():
+        async with websockets.connect(f"ws://127.0.0.1:{port}") as ws:
+            # Allow registration
+            await asyncio.sleep(0.05)
+            server.send_command("play_pause")
+            server.send_command("seek", position=12.5)
+            msg1 = await asyncio.wait_for(ws.recv(), timeout=2.0)
+            msg2 = await asyncio.wait_for(ws.recv(), timeout=2.0)
+            received_commands.append(json.loads(msg1))
+            received_commands.append(json.loads(msg2))
+
+    asyncio.run(client_listener())
+    server.stop()
+
+    assert len(received_commands) == 2
+    assert received_commands[0]["action"] == "play_pause"
+    assert received_commands[1]["action"] == "seek"
+    assert received_commands[1]["position"] == 12.5

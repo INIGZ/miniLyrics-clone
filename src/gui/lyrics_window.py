@@ -165,8 +165,20 @@ class LyricsDisplay(QWidget):
         self._cached_sublines = []
         self.update()
 
+    def get_line_index_at_y(self, y: float) -> int:
+        """Find the lyric line index corresponding to vertical widget coordinate y."""
+        if not self.lines:
+            return -1
+        cy = self.height() / 2.0
+        heights, y_positions = self.compute_layout()
+        for i in range(len(self.lines)):
+            top_y = cy + (y_positions[i] - self.scroll_y)
+            if top_y <= y <= top_y + heights[i]:
+                return i
+        return -1
+
     def mousePressEvent(self, event) -> None:
-        # Delegate mouse press to parent LyricsWindow for dragging
+        self._press_pos = event.pos()
         window = self.window()
         if window and hasattr(window, "start_drag"):
             window.start_drag(event)
@@ -184,8 +196,17 @@ class LyricsDisplay(QWidget):
         window = self.window()
         if window and hasattr(window, "end_drag"):
             window.end_drag(event)
-        else:
-            event.ignore()
+
+        # Click-to-seek: if mouse was clicked without dragging, seek Spotify to clicked lyric
+        if event.button() == Qt.LeftButton and hasattr(self, "_press_pos") and self._press_pos is not None:
+            dist = (event.pos() - self._press_pos).manhattanLength()
+            if dist < 6:
+                idx = self.get_line_index_at_y(event.pos().y())
+                if 0 <= idx < len(self.lines):
+                    line = self.lines[idx]
+                    if hasattr(window, "send_command"):
+                        window.send_command("seek", position=line.timestamp)
+        self._press_pos = None
 
     def paintEvent(self, event) -> None:
         painter = QPainter(self)
@@ -327,12 +348,14 @@ class LyricsWindow(QWidget):
     def __init__(
         self,
         lrclib_client: LRCLibClient | None = None,
+        ws_server: Any = None,
         always_on_top: bool = True,
         transparent_bg: bool = False,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.lrclib_client = lrclib_client or LRCLibClient()
+        self.ws_server = ws_server
         self._always_on_top = always_on_top
         self._transparent_bg = transparent_bg
         self._is_locked = False
@@ -412,6 +435,25 @@ class LyricsWindow(QWidget):
         self.title_artist_label.setStyleSheet("color: rgba(255, 255, 255, 220); font-weight: bold; font-size: 11px;")
         self.title_artist_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         header_layout.addWidget(self.title_artist_label)
+
+        # Spotify Web Player media controls
+        self.btn_prev = QPushButton("⏮", self.header_bar)
+        self.btn_prev.setToolTip("Previous Track (Ctrl+Left)")
+        self.btn_prev.setFixedWidth(24)
+        self.btn_prev.clicked.connect(lambda: self.send_command("prev"))
+        header_layout.addWidget(self.btn_prev)
+
+        self.btn_play_pause = QPushButton("⏯", self.header_bar)
+        self.btn_play_pause.setToolTip("Play / Pause (Space)")
+        self.btn_play_pause.setFixedWidth(24)
+        self.btn_play_pause.clicked.connect(lambda: self.send_command("play_pause"))
+        header_layout.addWidget(self.btn_play_pause)
+
+        self.btn_next = QPushButton("⏭", self.header_bar)
+        self.btn_next.setToolTip("Next Track (Ctrl+Right)")
+        self.btn_next.setFixedWidth(24)
+        self.btn_next.clicked.connect(lambda: self.send_command("next"))
+        header_layout.addWidget(self.btn_next)
 
         self.offset_label = QLabel("[Offset: +0.0s]", self.header_bar)
         self.offset_label.setStyleSheet("color: rgba(255, 255, 255, 180); font-size: 11px; font-family: monospace;")
@@ -499,6 +541,18 @@ class LyricsWindow(QWidget):
         self.action_transparent_bg.triggered.connect(self.set_transparent_background)
         tray_menu.addAction(self.action_transparent_bg)
 
+        self.action_play_pause = QAction("Play / Pause", self)
+        self.action_play_pause.triggered.connect(lambda: self.send_command("play_pause"))
+        tray_menu.addAction(self.action_play_pause)
+
+        self.action_next = QAction("Next Track", self)
+        self.action_next.triggered.connect(lambda: self.send_command("next"))
+        tray_menu.addAction(self.action_next)
+
+        self.action_prev = QAction("Previous Track", self)
+        self.action_prev.triggered.connect(lambda: self.send_command("prev"))
+        tray_menu.addAction(self.action_prev)
+
         self.action_bubble = QAction("Collapse to Bubble / Expand", self)
         self.action_bubble.triggered.connect(self.toggle_bubble)
         tray_menu.addAction(self.action_bubble)
@@ -530,6 +584,12 @@ class LyricsWindow(QWidget):
         self.bubble_shortcut.activated.connect(self.toggle_bubble)
         self.minimize_shortcut = QShortcut(QKeySequence("Ctrl+N"), self)
         self.minimize_shortcut.activated.connect(self.minimize_to_tray)
+        self.play_shortcut = QShortcut(QKeySequence("Space"), self)
+        self.play_shortcut.activated.connect(lambda: self.send_command("play_pause"))
+        self.next_shortcut = QShortcut(QKeySequence("Ctrl+Right"), self)
+        self.next_shortcut.activated.connect(lambda: self.send_command("next"))
+        self.prev_shortcut = QShortcut(QKeySequence("Ctrl+Left"), self)
+        self.prev_shortcut.activated.connect(lambda: self.send_command("prev"))
         self.quit_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self)
         self.quit_shortcut.activated.connect(self.quit_app)
         self.sub_offset_shortcut = QShortcut(QKeySequence("["), self)
@@ -702,6 +762,11 @@ class LyricsWindow(QWidget):
         self.offset_label.setText(f"[Offset: {sign}{secs:.1f}s]")
 
     # Bubble collapse & expand
+    def send_command(self, action: str, **kwargs: Any) -> None:
+        """Send a playback control command (play_pause, next, prev, seek) to Spotify Web."""
+        if self.ws_server and hasattr(self.ws_server, "send_command"):
+            self.ws_server.send_command(action, **kwargs)
+
     def collapse_to_bubble(self) -> None:
         """Collapse lyrics window into a compact floating bubble."""
         self._saved_geometry = self.geometry()

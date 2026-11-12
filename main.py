@@ -114,13 +114,14 @@ def main(argv: list[str] | None = None) -> int:
     app.setApplicationName("MiniLyrics")
 
     client = LRCLibClient()
+    server = WebSocketServer(port=args.port)
     window = LyricsWindow(
         lrclib_client=client,
+        ws_server=server,
         always_on_top=not args.no_top,
         transparent_bg=args.transparent_bg,
     )
 
-    server = WebSocketServer(port=args.port)
     server.playback_updated.connect(window.update_playback)
     server.start()
 

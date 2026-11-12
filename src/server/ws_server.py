@@ -29,9 +29,11 @@ class WebSocketServer(QThread):
         self._loop: asyncio.AbstractEventLoop | None = None
         self._stop_event: asyncio.Event | None = None
         self._server = None
+        self._clients: set[Any] = set()
 
     async def _handle_connection(self, websocket: Any) -> None:
-        """Handle incoming WebSocket client messages."""
+        """Handle incoming WebSocket client messages and manage active client set."""
+        self._clients.add(websocket)
         try:
             async for raw_message in websocket:
                 if not raw_message:
@@ -51,6 +53,22 @@ class WebSocketServer(QThread):
             pass
         except Exception as e:
             logger.debug("WebSocket connection error: %s", e)
+        finally:
+            self._clients.discard(websocket)
+
+    def send_command(self, action: str, **kwargs: Any) -> None:
+        """Send a playback control command to all connected browser clients."""
+        payload = json.dumps({"type": "command", "action": action, **kwargs})
+        if self._loop and self._loop.is_running():
+            asyncio.run_coroutine_threadsafe(self._broadcast(payload), self._loop)
+
+    async def _broadcast(self, message: str) -> None:
+        """Broadcast message string to all active WebSocket clients."""
+        if not self._clients:
+            return
+        tasks = [asyncio.create_task(client.send(message)) for client in list(self._clients)]
+        if tasks:
+            await asyncio.gather(*tasks, return_exceptions=True)
 
     async def _run_server(self) -> None:
         """Run the WebSocket server until stop_event is set."""
