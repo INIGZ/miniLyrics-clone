@@ -7,7 +7,8 @@ A lightweight, modern MiniLyrics clone for Spotify Web Player ([open.spotify.com
 ## Features
 
 - **Compact & Floating (510×120 Default Size)**: 50% shorter height and 75% width by default for a sleek, unobtrusive desktop strip that floats above all apps.
-- **Crystal-Themed Header Bar (Focus-Revealed)**: In Glass mode, the header bar features an opaque beveled crystal glass gradient with metallic highlights that automatically reveals when the window is focused or hovered, and hides when unfocused.
+- **2-Row Crystal Header Bar (Focus-Revealed)**: In Glass mode, the header is organized into two clean rows (Row 1: Track title & window actions; Row 2: Playback controls & timing offset) with an opaque beveled crystal glass gradient that reveals on focus or hover.
+- **Crisp Black Font Outline**: Replaces directional drop shadow with a solid 360-degree black outline around every lyric character, guaranteeing high-contrast readability over bright or dark wallpapers in transparent mode.
 - **Transparent, Borderless, Always-on-Top Desktop Overlay**: Floats unobtrusively above all applications with a translucent dark backdrop, rounded corners, and smooth typography.
 - **Full Playback Control of Spotify Web**: Control Spotify directly from the overlay via header buttons (`⏮`, `⏯`, `⏭`), keyboard shortcuts (`Space`, `Ctrl+Left`, `Ctrl+Right`), or tray menu.
 - **Click-to-Seek Any Verse**: Left-click any lyric line in the window to instantly jump Spotify Web Player playback to that exact timestamp!

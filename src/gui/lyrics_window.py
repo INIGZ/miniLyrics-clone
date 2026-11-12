@@ -221,18 +221,14 @@ class LyricsDisplay(QWidget):
 
         if not self.lines:
             painter.setFont(self.font_normal)
-            painter.setPen(QColor(0, 0, 0, 200))
-            painter.drawText(
-                QRectF(17, 1, w - 32, h),
-                Qt.AlignCenter | Qt.TextWordWrap,
-                self.status_text or "Waiting for Spotify playback...",
-            )
-            painter.setPen(QColor(255, 255, 255, 180))
-            painter.drawText(
-                QRectF(16, 0, w - 32, h),
-                Qt.AlignCenter | Qt.TextWordWrap,
-                self.status_text or "Waiting for Spotify playback...",
-            )
+            status_text = self.status_text or "Waiting for Spotify playback..."
+            status_rect = QRectF(16, 0, w - 32, h)
+            # Crisp black outline around status text
+            painter.setPen(QColor(0, 0, 0, 255))
+            for dx, dy in ((-1.5, 0), (1.5, 0), (0, -1.5), (0, 1.5), (-1.2, -1.2), (1.2, -1.2), (-1.2, 1.2), (1.2, 1.2)):
+                painter.drawText(status_rect.translated(dx, dy), Qt.AlignCenter | Qt.TextWordWrap, status_text)
+            painter.setPen(QColor(255, 255, 255, 220))
+            painter.drawText(status_rect, Qt.AlignCenter | Qt.TextWordWrap, status_text)
             return
 
         heights, y_positions = self.compute_layout()
@@ -268,11 +264,12 @@ class LyricsDisplay(QWidget):
             for s_idx, s_text in enumerate(sublines):
                 sub_rect = QRectF(20, start_y + s_idx * step_h, content_w, step_h)
 
-                # Draw drop shadow for crisp readability over any background
-                painter.setPen(QColor(0, 0, 0, 210))
-                painter.drawText(sub_rect.translated(1.5, 1.5), Qt.AlignCenter | Qt.TextSingleLine, s_text)
+                # Draw crisp black outline around glyphs
+                painter.setPen(QColor(0, 0, 0, 255))
+                for dx, dy in ((-1.5, 0), (1.5, 0), (0, -1.5), (0, 1.5), (-1.2, -1.2), (1.2, -1.2), (-1.2, 1.2), (1.2, 1.2)):
+                    painter.drawText(sub_rect.translated(dx, dy), Qt.AlignCenter | Qt.TextSingleLine, s_text)
 
-                # Draw main text
+                # Draw main text in center
                 painter.setPen(text_color)
                 painter.drawText(sub_rect, Qt.AlignCenter | Qt.TextSingleLine, s_text)
 
@@ -422,79 +419,94 @@ class LyricsWindow(QWidget):
         container_layout.setContentsMargins(12, 6, 12, 6)
         container_layout.setSpacing(4)
 
-        # Header Bar
+        # Header Bar: Reshaped into 2 clean rows
         self.header_bar = QWidget(self.container)
         self.header_bar.setObjectName("header_bar")
         self.header_bar.setMouseTracking(True)
-        header_layout = QHBoxLayout(self.header_bar)
-        header_layout.setContentsMargins(8, 3, 8, 3)
-        header_layout.setSpacing(6)
+        header_vbox = QVBoxLayout(self.header_bar)
+        header_vbox.setContentsMargins(8, 4, 8, 4)
+        header_vbox.setSpacing(4)
+
+        # Row 1: Track Title & Window Action Controls
+        row1 = QHBoxLayout()
+        row1.setContentsMargins(0, 0, 0, 0)
+        row1.setSpacing(6)
 
         self.title_artist_label = QLabel("MiniLyrics", self.header_bar)
-        self.title_artist_label.setStyleSheet("color: rgba(255, 255, 255, 220); font-weight: bold; font-size: 11px;")
+        self.title_artist_label.setStyleSheet("color: rgba(255, 255, 255, 225); font-weight: bold; font-size: 11px;")
         self.title_artist_label.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        header_layout.addWidget(self.title_artist_label)
-
-        # Spotify Web Player media controls
-        self.btn_prev = QPushButton("⏮", self.header_bar)
-        self.btn_prev.setToolTip("Previous Track (Ctrl+Left)")
-        self.btn_prev.setFixedWidth(24)
-        self.btn_prev.clicked.connect(lambda: self.send_command("prev"))
-        header_layout.addWidget(self.btn_prev)
-
-        self.btn_play_pause = QPushButton("⏯", self.header_bar)
-        self.btn_play_pause.setToolTip("Play / Pause (Space)")
-        self.btn_play_pause.setFixedWidth(24)
-        self.btn_play_pause.clicked.connect(lambda: self.send_command("play_pause"))
-        header_layout.addWidget(self.btn_play_pause)
-
-        self.btn_next = QPushButton("⏭", self.header_bar)
-        self.btn_next.setToolTip("Next Track (Ctrl+Right)")
-        self.btn_next.setFixedWidth(24)
-        self.btn_next.clicked.connect(lambda: self.send_command("next"))
-        header_layout.addWidget(self.btn_next)
-
-        self.offset_label = QLabel("[Offset: +0.0s]", self.header_bar)
-        self.offset_label.setStyleSheet("color: rgba(255, 255, 255, 180); font-size: 11px; font-family: monospace;")
-        header_layout.addWidget(self.offset_label)
-
-        self.btn_sub_offset = QPushButton("-0.5s", self.header_bar)
-        self.btn_sub_offset.setToolTip("Decrease offset by 0.5s")
-        self.btn_sub_offset.clicked.connect(lambda: self.adjust_offset(-500))
-        header_layout.addWidget(self.btn_sub_offset)
-
-        self.btn_add_offset = QPushButton("+0.5s", self.header_bar)
-        self.btn_add_offset.setToolTip("Increase offset by 0.5s")
-        self.btn_add_offset.clicked.connect(lambda: self.adjust_offset(500))
-        header_layout.addWidget(self.btn_add_offset)
+        row1.addWidget(self.title_artist_label)
 
         self.btn_bg_mode = QPushButton("🎨 Clear" if self._transparent_bg else "🎨 Glass", self.header_bar)
         self.btn_bg_mode.setToolTip("Toggle Transparent Background (Text Only) (Ctrl+B)")
         self.btn_bg_mode.clicked.connect(lambda: self.set_transparent_background(not self._transparent_bg))
-        header_layout.addWidget(self.btn_bg_mode)
+        row1.addWidget(self.btn_bg_mode)
 
         self.btn_lock = QPushButton("🔒 Lock", self.header_bar)
         self.btn_lock.setToolTip("Lock click-through mode (Ctrl+L)")
         self.btn_lock.clicked.connect(lambda: self.toggle_lock())
-        header_layout.addWidget(self.btn_lock)
+        row1.addWidget(self.btn_lock)
 
         self.btn_bubble = QPushButton("🫧", self.header_bar)
         self.btn_bubble.setToolTip("Collapse into Floating Bubble (Ctrl+M)")
         self.btn_bubble.setFixedWidth(24)
         self.btn_bubble.clicked.connect(self.collapse_to_bubble)
-        header_layout.addWidget(self.btn_bubble)
+        row1.addWidget(self.btn_bubble)
 
         self.btn_minimize = QPushButton("—", self.header_bar)
         self.btn_minimize.setToolTip("Minimize to Tray (Ctrl+N)")
         self.btn_minimize.setFixedWidth(24)
         self.btn_minimize.clicked.connect(self.minimize_to_tray)
-        header_layout.addWidget(self.btn_minimize)
+        row1.addWidget(self.btn_minimize)
 
         self.btn_close = QPushButton("✕", self.header_bar)
         self.btn_close.setToolTip("Close and Exit Process (Ctrl+Q)")
         self.btn_close.setFixedWidth(24)
         self.btn_close.clicked.connect(self.quit_app)
-        header_layout.addWidget(self.btn_close)
+        row1.addWidget(self.btn_close)
+
+        header_vbox.addLayout(row1)
+
+        # Row 2: Playback Controls & Sync Calibration
+        row2 = QHBoxLayout()
+        row2.setContentsMargins(0, 0, 0, 0)
+        row2.setSpacing(6)
+
+        self.btn_prev = QPushButton("⏮", self.header_bar)
+        self.btn_prev.setToolTip("Previous Track (Ctrl+Left)")
+        self.btn_prev.setFixedWidth(26)
+        self.btn_prev.clicked.connect(lambda: self.send_command("prev"))
+        row2.addWidget(self.btn_prev)
+
+        self.btn_play_pause = QPushButton("⏯", self.header_bar)
+        self.btn_play_pause.setToolTip("Play / Pause (Space)")
+        self.btn_play_pause.setFixedWidth(26)
+        self.btn_play_pause.clicked.connect(lambda: self.send_command("play_pause"))
+        row2.addWidget(self.btn_play_pause)
+
+        self.btn_next = QPushButton("⏭", self.header_bar)
+        self.btn_next.setToolTip("Next Track (Ctrl+Right)")
+        self.btn_next.setFixedWidth(26)
+        self.btn_next.clicked.connect(lambda: self.send_command("next"))
+        row2.addWidget(self.btn_next)
+
+        row2.addStretch(1)
+
+        self.offset_label = QLabel("[Offset: +0.0s]", self.header_bar)
+        self.offset_label.setStyleSheet("color: rgba(255, 255, 255, 180); font-size: 11px; font-family: monospace;")
+        row2.addWidget(self.offset_label)
+
+        self.btn_sub_offset = QPushButton("-0.5s", self.header_bar)
+        self.btn_sub_offset.setToolTip("Decrease offset by 0.5s")
+        self.btn_sub_offset.clicked.connect(lambda: self.adjust_offset(-500))
+        row2.addWidget(self.btn_sub_offset)
+
+        self.btn_add_offset = QPushButton("+0.5s", self.header_bar)
+        self.btn_add_offset.setToolTip("Increase offset by 0.5s")
+        self.btn_add_offset.clicked.connect(lambda: self.adjust_offset(500))
+        row2.addWidget(self.btn_add_offset)
+
+        header_vbox.addLayout(row2)
 
         container_layout.addWidget(self.header_bar)
 
