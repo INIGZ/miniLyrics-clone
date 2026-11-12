@@ -11,7 +11,7 @@ import threading
 import time
 from typing import Any
 
-from PyQt5.QtCore import QPoint, QRectF, Qt, QTimer, pyqtSignal
+from PyQt5.QtCore import QEvent, QPoint, QRectF, Qt, QTimer, pyqtSignal
 from PyQt5.QtGui import (
     QColor,
     QFont,
@@ -106,9 +106,9 @@ class LyricsDisplay(QWidget):
 
     def update_font_sizes(self, w: int, h: int) -> None:
         """Dynamically adapt font sizes based on window dimensions."""
-        scale = (w / 680.0) * 0.35 + (h / 240.0) * 0.65
+        scale = (w / 510.0) * 0.40 + (h / 120.0) * 0.60
         normal_pt = max(10, min(28, int(13 * scale)))
-        active_pt = max(14, min(38, int(18 * scale)))
+        active_pt = max(14, min(38, int(17 * scale)))
         changed = False
         if self.font_normal.pointSize() != normal_pt:
             self.font_normal.setPointSize(normal_pt)
@@ -385,8 +385,8 @@ class LyricsWindow(QWidget):
         self.setWindowFlags(flags)
         self.setAttribute(Qt.WA_TranslucentBackground, True)
         self.setMouseTracking(True)
-        self.resize(680, 240)
-        self.setMinimumSize(360, 140)
+        self.resize(510, 120)
+        self.setMinimumSize(280, 70)
 
         self._init_ui()
         self._init_tray()
@@ -401,12 +401,11 @@ class LyricsWindow(QWidget):
         self._anim_timer.timeout.connect(self._on_anim_tick)
         self._anim_timer.start()
 
-        # Initial auto-hide timer for header bar
+        # Header bar auto-hide timer (header is hidden until focused)
         self._header_timer = QTimer(self)
         self._header_timer.setSingleShot(True)
         self._header_timer.timeout.connect(self._on_header_timer_timeout)
-        self.header_bar.show()
-        self._header_timer.start(2000)
+        self.header_bar.hide()
 
     def _init_ui(self) -> None:
         root_layout = QVBoxLayout(self)
@@ -420,16 +419,16 @@ class LyricsWindow(QWidget):
         self._apply_container_style()
 
         container_layout = QVBoxLayout(self.container)
-        container_layout.setContentsMargins(14, 10, 14, 10)
-        container_layout.setSpacing(6)
+        container_layout.setContentsMargins(12, 6, 12, 6)
+        container_layout.setSpacing(4)
 
         # Header Bar
         self.header_bar = QWidget(self.container)
         self.header_bar.setObjectName("header_bar")
         self.header_bar.setMouseTracking(True)
         header_layout = QHBoxLayout(self.header_bar)
-        header_layout.setContentsMargins(0, 0, 0, 0)
-        header_layout.setSpacing(8)
+        header_layout.setContentsMargins(8, 3, 8, 3)
+        header_layout.setSpacing(6)
 
         self.title_artist_label = QLabel("MiniLyrics", self.header_bar)
         self.title_artist_label.setStyleSheet("color: rgba(255, 255, 255, 220); font-weight: bold; font-size: 11px;")
@@ -646,13 +645,34 @@ class LyricsWindow(QWidget):
         self.end_drag(event)
         super().mouseReleaseEvent(event)
 
+    def changeEvent(self, event) -> None:
+        if event.type() == QEvent.ActivationChange:
+            if not self._is_locked:
+                if self.isActiveWindow():
+                    self._show_header()
+                else:
+                    self.header_bar.hide()
+                    self._header_timer.stop()
+        super().changeEvent(event)
+
+    def focusInEvent(self, event) -> None:
+        if not self._is_locked:
+            self._show_header()
+        super().focusInEvent(event)
+
+    def focusOutEvent(self, event) -> None:
+        if not self._is_locked:
+            self.header_bar.hide()
+            self._header_timer.stop()
+        super().focusOutEvent(event)
+
     def enterEvent(self, event) -> None:
         if not self._is_locked:
             self._show_header()
         super().enterEvent(event)
 
     def leaveEvent(self, event) -> None:
-        if not self._is_locked:
+        if not self._is_locked and not self.isActiveWindow():
             self.header_bar.hide()
             self._header_timer.stop()
         super().leaveEvent(event)
@@ -702,28 +722,46 @@ class LyricsWindow(QWidget):
     def _apply_container_style(self) -> None:
         if getattr(self, "_transparent_bg", False):
             bg_css = "background-color: transparent; border: none;"
+            header_css = """
+                background-color: rgba(22, 26, 32, 240);
+                border: 1px solid rgba(255, 255, 255, 55);
+                border-top: 1px solid rgba(255, 255, 255, 95);
+                border-radius: 8px;
+            """
         else:
-            bg_css = "background-color: rgba(18, 18, 18, 210); border: 1px solid rgba(255, 255, 255, 30); border-radius: 12px;"
+            # Glass mode: crystal-like dark acrylic container
+            bg_css = "background-color: rgba(18, 22, 28, 215); border: 1px solid rgba(255, 255, 255, 35); border-radius: 12px;"
+            # Non-transparent crystal-like header bar with beveled glass highlights
+            header_css = """
+                background: qlineargradient(x1:0, y1:0, x2:0, y2:1, stop:0 rgba(44, 52, 65, 255), stop:1 rgba(22, 27, 35, 255));
+                border: 1px solid rgba(255, 255, 255, 75);
+                border-top: 1px solid rgba(255, 255, 255, 140);
+                border-bottom: 1px solid rgba(0, 0, 0, 180);
+                border-radius: 8px;
+            """
 
         self.container.setStyleSheet(f"""
             #container {{
                 {bg_css}
             }}
+            #header_bar {{
+                {header_css}
+            }}
             QPushButton {{
-                background-color: rgba(255, 255, 255, 25);
-                border: 1px solid rgba(255, 255, 255, 45);
+                background-color: rgba(255, 255, 255, 28);
+                border: 1px solid rgba(255, 255, 255, 60);
                 border-radius: 4px;
                 color: #FFFFFF;
                 font-size: 11px;
                 font-weight: 500;
-                padding: 2px 7px;
+                padding: 2px 6px;
             }}
             QPushButton:hover {{
-                background-color: rgba(255, 255, 255, 45);
-                border-color: rgba(255, 255, 255, 75);
+                background-color: rgba(255, 255, 255, 60);
+                border-color: rgba(255, 255, 255, 130);
             }}
             QPushButton:pressed {{
-                background-color: rgba(255, 255, 255, 70);
+                background-color: rgba(255, 255, 255, 85);
             }}
         """)
 

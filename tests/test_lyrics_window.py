@@ -24,8 +24,10 @@ def test_lyrics_window_init(qapp):
     assert bool(win.windowFlags() & Qt.FramelessWindowHint)
     assert bool(win.windowFlags() & Qt.WindowStaysOnTopHint)
     assert win.testAttribute(Qt.WA_TranslucentBackground)
-    assert win.minimumWidth() >= 320
-    assert win.minimumHeight() >= 140
+    assert win.width() == 510
+    assert win.height() == 120
+    assert win.minimumWidth() >= 250
+    assert win.minimumHeight() >= 60
     win.close()
 
 
@@ -139,7 +141,7 @@ def test_minimize_to_tray(qapp):
 def test_transparent_background_toggle(qapp):
     win = LyricsWindow(transparent_bg=False)
     assert not win._transparent_bg
-    assert "rgba(18, 18, 18, 210)" in win.container.styleSheet()
+    assert "rgba(18, 22, 28, 215)" in win.container.styleSheet()
 
     # Toggle to transparent background (text only)
     win.set_transparent_background(True)
@@ -150,7 +152,7 @@ def test_transparent_background_toggle(qapp):
     # Toggle back to glass background
     win.set_transparent_background(False)
     assert not win._transparent_bg
-    assert "rgba(18, 18, 18, 210)" in win.container.styleSheet()
+    assert "rgba(18, 22, 28, 215)" in win.container.styleSheet()
     assert win.btn_bg_mode.text() == "🎨 Glass"
     win.close()
 
@@ -291,6 +293,25 @@ def test_window_controls_present(qapp):
     assert win.btn_bubble.text() == "🫧"
     assert win.btn_minimize.text() == "—"
     assert win.btn_play_pause.text() == "⏯"
+    win.close()
+
+
+def test_glass_mode_crystal_header_and_focus(qapp):
+    win = LyricsWindow(transparent_bg=False)
+    win.show()
+    # Header bar is hidden by default until focused
+    assert win.header_bar.isHidden()
+
+    # Glass mode features non-transparent crystal gradient styling in header_bar
+    style = win.container.styleSheet()
+    assert "qlineargradient" in style
+    assert "rgba(44, 52, 65, 255)" in style
+    assert "border-top: 1px solid rgba(255, 255, 255, 140)" in style
+
+    # Trigger focus: header bar reveals
+    win._show_header()
+    assert not win.header_bar.isHidden()
+    assert win.header_bar.isVisible()
     win.close()
     win.close()
 
