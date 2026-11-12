@@ -153,6 +153,9 @@ python -m src.simulator.mock_spotify --test
 
 | Action | Control / Hotkey | Description |
 |---|---|---|
+| **Collapse to Bubble** | `Ctrl + M` / Header `🫧` | Collapses overlay into a compact floating bubble. Click bubble or press `Ctrl+M` to expand. |
+| **Minimize** | `Ctrl + N` / Header `—` | Minimizes window to taskbar/tray. |
+| **Exit Process** | `Ctrl + Q` / Header `✕` | Immediately kills the process and terminates the application cleanly. |
 | **Click-Through / Lock** | `Ctrl + L` / Header `🔒 Lock` | Toggles input transparency. Clicks pass through to desktop/apps behind. |
 | **Unlock Window** | **System Tray Icon Click** | Restores normal window input when click-through mode is active. |
 | **Transparent Background** | `Ctrl + B` / Header `🎨 Clear` | Toggles background container between dark glass and 100% transparent (text-only). |
@@ -162,13 +165,12 @@ python -m src.simulator.mock_spotify --test
 | **Increase Offset** | `]` or `[+0.5s]` button | Adjusts lyric timing by +500ms (lyrics display later). |
 | **Reset Offset** | System Tray Menu | Resets manual offset calibration back to `+0.0s`. |
 | **Opacity Slider** | Header Horizontal Slider | Adjusts window opacity continuously from 30% to 100%. |
-| **Close Overlay** | `✕` button / Tray -> Quit | Cleanly terminates WebSocket server and closes application. |
 
 ---
 
 ## Testing
 
-Run the automated pytest suite (39 unit tests covering parsing, caching, GUI state, and WebSockets):
+Run the automated pytest suite (46 unit tests covering parsing, caching, GUI state, bubble collapse, and WebSockets):
 
 ```bash
 pytest -v

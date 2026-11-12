@@ -243,3 +243,41 @@ def test_monotonic_forward_clock_no_oscillation(qapp):
     assert win._active_idx == 1
     win.close()
 
+
+def test_collapse_and_expand_bubble(qapp):
+    win = LyricsWindow()
+    win.show()
+    assert win.isVisible()
+    assert not win.bubble.isVisible()
+
+    # Collapse to bubble
+    win.collapse_to_bubble()
+    assert not win.isVisible()
+    assert win.bubble.isVisible()
+
+    # Expand from bubble
+    win.expand_from_bubble()
+    assert win.isVisible()
+    assert not win.bubble.isVisible()
+
+    # Toggle bubble
+    win.toggle_bubble()
+    assert not win.isVisible()
+    assert win.bubble.isVisible()
+
+    win.toggle_bubble()
+    assert win.isVisible()
+    assert not win.bubble.isVisible()
+
+    win.close()
+
+
+def test_window_controls_present(qapp):
+    win = LyricsWindow()
+    assert win.btn_bubble is not None
+    assert win.btn_minimize is not None
+    assert win.btn_close is not None
+    assert win.btn_bubble.text() == "🫧"
+    assert win.btn_minimize.text() == "—"
+    win.close()
+

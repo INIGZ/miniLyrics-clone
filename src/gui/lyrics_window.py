@@ -256,6 +256,69 @@ class LyricsDisplay(QWidget):
                 painter.drawText(sub_rect, Qt.AlignCenter | Qt.TextSingleLine, s_text)
 
 
+class LyricsBubble(QWidget):
+    """Compact floating desktop bubble when lyrics window is collapsed."""
+
+    def __init__(self, main_window: "LyricsWindow") -> None:
+        super().__init__()
+        self.main_window = main_window
+        self._drag_pos: QPoint | None = None
+        self._is_dragging = False
+
+        flags = Qt.FramelessWindowHint | Qt.Tool
+        if main_window._always_on_top:
+            flags |= Qt.WindowStaysOnTopHint
+        self.setWindowFlags(flags)
+        self.setAttribute(Qt.WA_TranslucentBackground, True)
+        self.setFixedSize(52, 52)
+        self.setToolTip("MiniLyrics (Click to expand, drag to move, Ctrl+M)")
+        self.setCursor(Qt.PointingHandCursor)
+
+        self.shortcut_toggle = QShortcut(QKeySequence("Ctrl+M"), self)
+        self.shortcut_toggle.activated.connect(self.main_window.expand_from_bubble)
+
+    def mousePressEvent(self, event) -> None:
+        if event.button() == Qt.LeftButton:
+            self._drag_pos = event.globalPos() - self.frameGeometry().topLeft()
+            self._is_dragging = False
+            event.accept()
+
+    def mouseMoveEvent(self, event) -> None:
+        if self._drag_pos is not None and event.buttons() == Qt.LeftButton:
+            self.move(event.globalPos() - self._drag_pos)
+            self._is_dragging = True
+            event.accept()
+
+    def mouseReleaseEvent(self, event) -> None:
+        if event.button() == Qt.LeftButton:
+            if not self._is_dragging:
+                self.main_window.expand_from_bubble()
+            self._drag_pos = None
+            self._is_dragging = False
+            event.accept()
+
+    def contextMenuEvent(self, event) -> None:
+        if hasattr(self.main_window, "tray_icon") and self.main_window.tray_icon and self.main_window.tray_icon.contextMenu():
+            self.main_window.tray_icon.contextMenu().exec_(event.globalPos())
+
+    def paintEvent(self, event) -> None:
+        painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
+        painter.setRenderHint(QPainter.TextAntialiasing)
+
+        rect = QRectF(2, 2, 48, 48)
+        # Translucent dark body with glowing Spotify green border
+        painter.setBrush(QColor(18, 18, 18, 235))
+        painter.setPen(QColor("#1DB954"))
+        painter.drawEllipse(rect)
+
+        # Musical note icon in center
+        painter.setPen(QColor("#1DB954"))
+        font = QFont("Segoe UI", 18, QFont.Bold)
+        painter.setFont(font)
+        painter.drawText(rect, Qt.AlignCenter, "♪")
+
+
 class LyricsWindow(QWidget):
     """Transparent always-on-top lyrics window with click-through mode."""
 
@@ -287,6 +350,10 @@ class LyricsWindow(QWidget):
         self._active_idx: int = -1
         self._current_scroll_y: float = 0.0
         self._target_scroll_y: float = 0.0
+        self._saved_geometry = None
+
+        # Floating bubble when collapsed
+        self.bubble = LyricsBubble(self)
 
         # Window styling and flags
         flags = Qt.FramelessWindowHint | Qt.Tool
@@ -378,10 +445,22 @@ class LyricsWindow(QWidget):
         self.opacity_slider.valueChanged.connect(self._on_opacity_changed)
         header_layout.addWidget(self.opacity_slider)
 
+        self.btn_bubble = QPushButton("🫧", self.header_bar)
+        self.btn_bubble.setToolTip("Collapse into Floating Bubble (Ctrl+M)")
+        self.btn_bubble.setFixedWidth(24)
+        self.btn_bubble.clicked.connect(self.collapse_to_bubble)
+        header_layout.addWidget(self.btn_bubble)
+
+        self.btn_minimize = QPushButton("—", self.header_bar)
+        self.btn_minimize.setToolTip("Minimize (Ctrl+N)")
+        self.btn_minimize.setFixedWidth(24)
+        self.btn_minimize.clicked.connect(self.showMinimized)
+        header_layout.addWidget(self.btn_minimize)
+
         self.btn_close = QPushButton("✕", self.header_bar)
-        self.btn_close.setToolTip("Close MiniLyrics")
+        self.btn_close.setToolTip("Close and Exit Process (Ctrl+Q)")
         self.btn_close.setFixedWidth(24)
-        self.btn_close.clicked.connect(self.close)
+        self.btn_close.clicked.connect(self.quit_app)
         header_layout.addWidget(self.btn_close)
 
         container_layout.addWidget(self.header_bar)
@@ -428,6 +507,14 @@ class LyricsWindow(QWidget):
         self.action_transparent_bg.triggered.connect(self.set_transparent_background)
         tray_menu.addAction(self.action_transparent_bg)
 
+        self.action_bubble = QAction("Collapse to Bubble / Expand", self)
+        self.action_bubble.triggered.connect(self.toggle_bubble)
+        tray_menu.addAction(self.action_bubble)
+
+        self.action_minimize = QAction("Minimize", self)
+        self.action_minimize.triggered.connect(self.showMinimized)
+        tray_menu.addAction(self.action_minimize)
+
         tray_menu.addSeparator()
 
         self.action_quit = QAction("Quit", self)
@@ -443,6 +530,12 @@ class LyricsWindow(QWidget):
         self.lock_shortcut.activated.connect(lambda: self.toggle_lock())
         self.bg_shortcut = QShortcut(QKeySequence("Ctrl+B"), self)
         self.bg_shortcut.activated.connect(lambda: self.set_transparent_background(not self._transparent_bg))
+        self.bubble_shortcut = QShortcut(QKeySequence("Ctrl+M"), self)
+        self.bubble_shortcut.activated.connect(self.toggle_bubble)
+        self.minimize_shortcut = QShortcut(QKeySequence("Ctrl+N"), self)
+        self.minimize_shortcut.activated.connect(self.showMinimized)
+        self.quit_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self)
+        self.quit_shortcut.activated.connect(self.quit_app)
         self.sub_offset_shortcut = QShortcut(QKeySequence("["), self)
         self.sub_offset_shortcut.activated.connect(lambda: self.adjust_offset(-500))
         self.add_offset_shortcut = QShortcut(QKeySequence("]"), self)
@@ -629,6 +722,42 @@ class LyricsWindow(QWidget):
         secs = self._manual_offset_ms / 1000.0
         sign = "+" if secs >= 0 else ""
         self.offset_label.setText(f"[Offset: {sign}{secs:.1f}s]")
+
+    # Bubble collapse & expand
+    def collapse_to_bubble(self) -> None:
+        """Collapse lyrics window into a compact floating bubble."""
+        self._saved_geometry = self.geometry()
+        bubble_x = self.x() + self.width() - 60
+        bubble_y = self.y() + 10
+        self.hide()
+        self.bubble.move(max(0, bubble_x), max(0, bubble_y))
+        self.bubble.show()
+
+    def expand_from_bubble(self) -> None:
+        """Expand from floating bubble back to full window."""
+        self.bubble.hide()
+        if hasattr(self, "_saved_geometry") and self._saved_geometry:
+            new_x = max(0, self.bubble.x() - self._saved_geometry.width() + 60)
+            new_y = max(0, self.bubble.y() - 10)
+            self.move(new_x, new_y)
+        self.show()
+        self.raise_()
+        self.activateWindow()
+
+    def toggle_bubble(self) -> None:
+        """Toggle between bubble mode and full window mode."""
+        if self.isVisible():
+            self.collapse_to_bubble()
+        else:
+            self.expand_from_bubble()
+
+    def quit_app(self) -> None:
+        """Kill the process and cleanly exit the application."""
+        if hasattr(self, "bubble"):
+            self.bubble.hide()
+        if hasattr(self, "tray_icon") and self.tray_icon:
+            self.tray_icon.hide()
+        QApplication.instance().quit()
 
     # High frequency 30ms animation loop
     def _on_anim_tick(self) -> None:
