@@ -66,7 +66,7 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         "--transparent-bg",
         "--clear-bg",
         action="store_true",
-        help="Start with 100% transparent background (text only)",
+        help="Start with 100%% transparent background (text only)",
     )
     return parser.parse_args(argv)
 
