@@ -370,6 +370,10 @@ class LyricsWindow(QWidget):
     def _init_shortcuts(self) -> None:
         self.lock_shortcut = QShortcut(QKeySequence("Ctrl+L"), self)
         self.lock_shortcut.activated.connect(lambda: self.toggle_lock())
+        self.sub_offset_shortcut = QShortcut(QKeySequence("["), self)
+        self.sub_offset_shortcut.activated.connect(lambda: self.adjust_offset(-500))
+        self.add_offset_shortcut = QShortcut(QKeySequence("]"), self)
+        self.add_offset_shortcut.activated.connect(lambda: self.adjust_offset(500))
 
     def _on_opacity_changed(self, value: int) -> None:
         self.setWindowOpacity(value / 100.0)
@@ -518,13 +522,15 @@ class LyricsWindow(QWidget):
 
             # Smooth exponential ease-out scrolling
             diff = self._target_scroll_y - self._current_scroll_y
-            if abs(diff) > 0.1:
+            scrolling = abs(diff) > 0.1
+            if scrolling:
                 self._current_scroll_y += diff * 0.15
             else:
                 self._current_scroll_y = self._target_scroll_y
 
-            self.lyrics_display.scroll_y = self._current_scroll_y
-            self.lyrics_display.update()
+            if scrolling or active_idx != self.lyrics_display.active_idx or abs(self.lyrics_display.scroll_y - self._current_scroll_y) > 0.05:
+                self.lyrics_display.scroll_y = self._current_scroll_y
+                self.lyrics_display.update()
 
     # Playback updates & lyrics fetching
     def update_playback(self, payload: dict[str, Any]) -> None:

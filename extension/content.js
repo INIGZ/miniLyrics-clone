@@ -220,12 +220,15 @@
       }
     }
 
-    badge.textContent = connected
-      ? "MiniLyrics: Connected 🟢"
-      : "MiniLyrics: Disconnected ⚪";
-    badge.className = connected
-      ? "minilyrics-connected"
-      : "minilyrics-disconnected";
+    if (badge._lastConnected !== connected) {
+      badge._lastConnected = connected;
+      badge.textContent = connected
+        ? "MiniLyrics: Connected 🟢"
+        : "MiniLyrics: Disconnected ⚪";
+      badge.className = connected
+        ? "minilyrics-connected"
+        : "minilyrics-disconnected";
+    }
   }
 
   function sendPlaybackUpdate(state) {
