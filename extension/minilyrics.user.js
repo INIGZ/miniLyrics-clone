@@ -6,7 +6,9 @@
 // @author       MiniLyrics
 // @match        *://open.spotify.com/*
 // @icon         https://open.spotifycdn.com/cdn/images/favicon.0f31d2ea.ico
-// @grant        none
+// @connect      127.0.0.1
+// @connect      localhost
+// @grant        GM_info
 // @run-at       document-idle
 // ==/UserScript==
 

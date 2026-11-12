@@ -97,28 +97,35 @@ python main.py --demo
 
 ---
 
-## Browser Extension & Userscript Setup
+## Browser Setup (Mozilla Firefox, Chrome, Edge, Brave)
 
 To sync playback status from Spotify Web Player to the desktop overlay:
 
-### Option A: Unpacked Chrome / Edge / Brave Extension (Recommended)
+### Mozilla Firefox Users (Recommended: Userscript)
 
-1. Open your Chromium-based browser and navigate to:
-   - Chrome: `chrome://extensions`
-   - Edge: `edge://extensions`
-   - Brave: `brave://extensions`
-2. Enable **Developer mode** (toggle switch in the top-right corner).
-3. Click **Load unpacked** in the top-left toolbar.
-4. Select the `extension/` folder in this repository (`miniLyrics/extension`).
-5. Open or refresh [open.spotify.com](https://open.spotify.com).
-6. When MiniLyrics is running, the status pill near the bottom-right playback controls will display:
-   `MiniLyrics: Connected 🟢`.
+Because Firefox removes temporary unpacked add-ons whenever the browser closes, **Option A (Userscript)** is the recommended permanent setup for Firefox:
 
-### Option B: Tampermonkey / Violentmonkey Userscript
+#### Option A: Persistent Userscript via Violentmonkey or Tampermonkey (Recommended for Firefox)
+1. Install [Violentmonkey](https://addons.mozilla.org/firefox/addon/violentmonkey/) or [Tampermonkey](https://addons.mozilla.org/firefox/addon/tampermonkey/) from Mozilla Add-ons.
+2. Click the extension toolbar icon and choose **Create a new script** (or **+**).
+3. Paste the full contents of [`extension/minilyrics.user.js`](extension/minilyrics.user.js).
+4. Save (`Ctrl+S`).
+5. Open [open.spotify.com](https://open.spotify.com) — it will automatically connect on every Firefox launch.
 
-1. Install [Tampermonkey](https://www.tampermonkey.net/) or [Violentmonkey](https://violentmonkey.github.io/) in your browser.
-2. Open extension dashboard, click **Create a new script**, and paste the full contents of [`extension/minilyrics.user.js`](extension/minilyrics.user.js).
-3. Save the script and navigate to [open.spotify.com](https://open.spotify.com).
+#### Option B: Firefox Temporary Add-on (about:debugging)
+1. In Firefox address bar, navigate to `about:debugging#/runtime/this-firefox`.
+2. Click **Load Temporary Add-on...**
+3. Select `extension/manifest.json`.
+4. Open [open.spotify.com](https://open.spotify.com).
+
+---
+
+### Chromium Users (Chrome, Edge, Brave)
+
+1. Open `chrome://extensions` (or `edge://extensions` / `brave://extensions`).
+2. Enable **Developer mode** (top-right toggle).
+3. Click **Load unpacked** (top-left) and choose the `extension/` folder.
+4. Open or refresh [open.spotify.com](https://open.spotify.com).
 
 ---
 
