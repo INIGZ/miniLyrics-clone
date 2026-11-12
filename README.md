@@ -7,6 +7,9 @@ A lightweight, modern MiniLyrics clone for Spotify Web Player ([open.spotify.com
 ## Features
 
 - **Transparent, Borderless, Always-on-Top Desktop Overlay**: Floats unobtrusively above all applications with a translucent dark backdrop, rounded corners, and smooth typography.
+- **Transparent Background (Text Only Mode)**: Toggle between sleek dark frosted glass and 100% transparent background (`Ctrl+B` or header `🎨 Clear` button) so *only the lyrics text floats directly on your screen* with a subtle text shadow for readability over any light or dark background.
+- **Full Word-Wrapping Support**: Automatically wraps long lines across multiple lines with dynamic height allocation so lyrics are never truncated or cut off horizontally.
+- **Resizable Window with Adaptive Font Sizing**: Scale the overlay to any size (small widget or large display); font size smoothly adapts to window dimensions automatically.
 - **Click-Through / Lock Mode (`Ctrl+L` or System Tray)**: Make the window completely transparent to mouse clicks (`Qt.WindowTransparentForInput`) so you can work, game, or browse unimpeded while lyrics scroll. Toggle back anytime via the system tray icon.
 - **Synchronized Scrolling Lyrics with Spotify Green Highlight**: Current singing lines are highlighted in Spotify vibrant green (`#1DB954`) and smoothly animated to the vertical center with exponential ease-out scrolling. Past and upcoming lines are rendered with subtle contrasting opacities.
 - **Instant Sync with open.spotify.com via WebSocket**: Dedicated background asyncio server on port `8765` receives real-time track metadata and playback position updates from Spotify Web Player.
@@ -152,8 +155,9 @@ python -m src.simulator.mock_spotify --test
 |---|---|---|
 | **Click-Through / Lock** | `Ctrl + L` / Header `🔒 Lock` | Toggles input transparency. Clicks pass through to desktop/apps behind. |
 | **Unlock Window** | **System Tray Icon Click** | Restores normal window input when click-through mode is active. |
+| **Transparent Background** | `Ctrl + B` / Header `🎨 Clear` | Toggles background container between dark glass and 100% transparent (text-only). |
 | **Move Overlay** | Left-click + Drag | Drag window anywhere on screen (header bar or background). |
-| **Resize Overlay** | Bottom-Right Grip | Drag the bottom-right size grip to scale window width/height. |
+| **Resize Overlay** | Bottom-Right Grip | Drag size grip to scale window; text size dynamically adapts. |
 | **Decrease Offset** | `[` or `[-0.5s]` button | Adjusts lyric timing by -500ms (lyrics display earlier). |
 | **Increase Offset** | `]` or `[+0.5s]` button | Adjusts lyric timing by +500ms (lyrics display later). |
 | **Reset Offset** | System Tray Menu | Resets manual offset calibration back to `+0.0s`. |

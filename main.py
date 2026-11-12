@@ -62,6 +62,12 @@ def parse_args(argv: list[str] | None = None) -> argparse.Namespace:
         action="store_true",
         help="Disable always-on-top window hint",
     )
+    parser.add_argument(
+        "--transparent-bg",
+        "--clear-bg",
+        action="store_true",
+        help="Start with 100% transparent background (text only)",
+    )
     return parser.parse_args(argv)
 
 
@@ -108,7 +114,11 @@ def main(argv: list[str] | None = None) -> int:
     app.setApplicationName("MiniLyrics")
 
     client = LRCLibClient()
-    window = LyricsWindow(lrclib_client=client, always_on_top=not args.no_top)
+    window = LyricsWindow(
+        lrclib_client=client,
+        always_on_top=not args.no_top,
+        transparent_bg=args.transparent_bg,
+    )
 
     server = WebSocketServer(port=args.port)
     server.playback_updated.connect(window.update_playback)

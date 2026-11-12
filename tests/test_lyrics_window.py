@@ -126,3 +126,59 @@ def test_opacity_slider(qapp):
     win.opacity_slider.setValue(80)
     assert round(win.windowOpacity(), 2) == 0.8
     win.close()
+
+
+def test_transparent_background_toggle(qapp):
+    win = LyricsWindow(transparent_bg=False)
+    assert not win._transparent_bg
+    assert "rgba(18, 18, 18, 210)" in win.container.styleSheet()
+
+    # Toggle to transparent background (text only)
+    win.set_transparent_background(True)
+    assert win._transparent_bg
+    assert "background-color: transparent" in win.container.styleSheet()
+    assert win.btn_bg_mode.text() == "🎨 Clear"
+
+    # Toggle back to glass background
+    win.set_transparent_background(False)
+    assert not win._transparent_bg
+    assert "rgba(18, 18, 18, 210)" in win.container.styleSheet()
+    assert win.btn_bg_mode.text() == "🎨 Glass"
+    win.close()
+
+
+def test_word_wrap_and_layout_computation(qapp):
+    win = LyricsWindow()
+    long_lrc = """[00:01.00]This is an extraordinarily long lyric line designed specifically to test word wrapping across multiple lines in MiniLyrics without horizontal clipping or truncating
+[00:05.00]Short line
+"""
+    win.load_lyrics_direct(long_lrc, title="Long Song", artist="Artist")
+    win.resize(400, 200)
+    heights, y_positions = win.lyrics_display.compute_layout()
+
+    assert len(heights) == 2
+    assert len(y_positions) == 2
+    # The long wrapped line must be allocated significantly more vertical height than the short line
+    assert heights[0] > heights[1]
+    assert y_positions[1] == y_positions[0] + heights[0]
+    win.close()
+
+
+def test_adaptive_font_sizing_on_resize(qapp):
+    win = LyricsWindow()
+    display = win.lyrics_display
+
+    # Small window size
+    display.update_font_sizes(380, 150)
+    small_normal = display.font_normal.pointSize()
+    small_active = display.font_active.pointSize()
+
+    # Large window size
+    display.update_font_sizes(1100, 480)
+    large_normal = display.font_normal.pointSize()
+    large_active = display.font_active.pointSize()
+
+    assert large_normal > small_normal
+    assert large_active > small_active
+    win.close()
+

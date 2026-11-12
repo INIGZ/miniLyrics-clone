@@ -62,7 +62,7 @@ def create_default_tray_icon() -> QIcon:
 
 
 class LyricsDisplay(QWidget):
-    """Custom-painted smooth-scrolling multi-line lyrics display."""
+    """Custom-painted smooth-scrolling multi-line lyrics display with word-wrap and adaptive font sizing."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -79,6 +79,39 @@ class LyricsDisplay(QWidget):
 
         self.setMouseTracking(True)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+
+    def update_font_sizes(self, w: int, h: int) -> None:
+        """Dynamically adapt font sizes based on window dimensions."""
+        scale = (w / 680.0) * 0.35 + (h / 240.0) * 0.65
+        normal_pt = max(10, min(30, int(13 * scale)))
+        active_pt = max(13, min(42, int(18 * scale)))
+        if self.font_normal.pointSize() != normal_pt:
+            self.font_normal.setPointSize(normal_pt)
+        if self.font_active.pointSize() != active_pt:
+            self.font_active.setPointSize(active_pt)
+
+    def compute_layout(self) -> tuple[list[float], list[float]]:
+        """Compute line heights and cumulative top y-offsets for all lines with word wrap."""
+        if not self.lines:
+            return [], []
+
+        w = max(100.0, float(self.width() - 40))
+        heights: list[float] = []
+        y_positions: list[float] = []
+        cur_y = 0.0
+
+        for i, line in enumerate(self.lines):
+            font = self.font_active if i == self.active_idx else self.font_normal
+            fm = QFontMetrics(font)
+            text = line.text if line.text else "• • •"
+            br = fm.boundingRect(0, 0, int(w), 10000, Qt.AlignCenter | Qt.TextWordWrap, text)
+            pad = 14.0 if i == self.active_idx else 8.0
+            h_i = max(float(br.height()) + pad, 26.0)
+            heights.append(h_i)
+            y_positions.append(cur_y)
+            cur_y += h_i
+
+        return heights, y_positions
 
     def set_lines(self, lines: list[LyricLine], status_text: str = "") -> None:
         self.lines = list(lines)
@@ -121,9 +154,17 @@ class LyricsDisplay(QWidget):
         h = self.height()
         cy = h / 2.0
 
+        self.update_font_sizes(w, h)
+
         if not self.lines:
             painter.setFont(self.font_normal)
-            painter.setPen(QColor(255, 255, 255, 140))
+            painter.setPen(QColor(0, 0, 0, 200))
+            painter.drawText(
+                QRectF(17, 1, w - 32, h),
+                Qt.AlignCenter | Qt.TextWordWrap,
+                self.status_text or "Waiting for Spotify playback...",
+            )
+            painter.setPen(QColor(255, 255, 255, 180))
             painter.drawText(
                 QRectF(16, 0, w - 32, h),
                 Qt.AlignCenter | Qt.TextWordWrap,
@@ -131,33 +172,37 @@ class LyricsDisplay(QWidget):
             )
             return
 
-        # Keep 5-7 lines visible based on available height
-        line_height = max(34.0, min(44.0, h / 6.0))
+        heights, y_positions = self.compute_layout()
+        content_w = max(100.0, float(w - 40))
 
         for i, line in enumerate(self.lines):
-            line_y = cy + (i * line_height - self.scroll_y)
+            line_h = heights[i]
+            top_y = cy + (y_positions[i] - self.scroll_y)
 
             # Cull lines outside viewport
-            if line_y + line_height < 0 or line_y - line_height > h:
+            if top_y + line_h < -20 or top_y > h + 20:
                 continue
 
             if i == self.active_idx:
                 painter.setFont(self.font_active)
-                painter.setPen(self.color_active)
-                fm = QFontMetrics(self.font_active)
+                text_color = self.color_active
             elif i < self.active_idx:
                 painter.setFont(self.font_normal)
-                painter.setPen(self.color_prev)
-                fm = QFontMetrics(self.font_normal)
+                text_color = self.color_prev
             else:
                 painter.setFont(self.font_normal)
-                painter.setPen(self.color_next)
-                fm = QFontMetrics(self.font_normal)
+                text_color = self.color_next
 
             raw_text = line.text if line.text else "• • •"
-            text = fm.elidedText(raw_text, Qt.ElideRight, int(w - 36))
-            rect = QRectF(18, line_y - line_height / 2.0, w - 36, line_height)
-            painter.drawText(rect, Qt.AlignCenter | Qt.TextSingleLine, text)
+            rect = QRectF(20, top_y, content_w, line_h)
+
+            # Draw subtle drop shadow for crisp readability over transparent backgrounds
+            painter.setPen(QColor(0, 0, 0, 210))
+            painter.drawText(rect.translated(1.5, 1.5), Qt.AlignCenter | Qt.TextWordWrap, raw_text)
+
+            # Draw main text with word wrapping
+            painter.setPen(text_color)
+            painter.drawText(rect, Qt.AlignCenter | Qt.TextWordWrap, raw_text)
 
 
 class LyricsWindow(QWidget):
@@ -169,11 +214,13 @@ class LyricsWindow(QWidget):
         self,
         lrclib_client: LRCLibClient | None = None,
         always_on_top: bool = True,
+        transparent_bg: bool = False,
         parent: QWidget | None = None,
     ) -> None:
         super().__init__(parent)
         self.lrclib_client = lrclib_client or LRCLibClient()
         self._always_on_top = always_on_top
+        self._transparent_bg = transparent_bg
         self._is_locked = False
         self._drag_pos: QPoint | None = None
 
@@ -225,49 +272,11 @@ class LyricsWindow(QWidget):
         root_layout.setContentsMargins(0, 0, 0, 0)
         root_layout.setSpacing(0)
 
-        # Container frame with dark translucent background
+        # Container frame with customizable background
         self.container = QFrame(self)
         self.container.setObjectName("container")
         self.container.setMouseTracking(True)
-        self.container.setStyleSheet("""
-            #container {
-                background-color: rgba(18, 18, 18, 210);
-                border: 1px solid rgba(255, 255, 255, 30);
-                border-radius: 12px;
-            }
-            QPushButton {
-                background-color: rgba(255, 255, 255, 25);
-                border: 1px solid rgba(255, 255, 255, 45);
-                border-radius: 4px;
-                color: #FFFFFF;
-                font-size: 11px;
-                font-weight: 500;
-                padding: 2px 7px;
-            }
-            QPushButton:hover {
-                background-color: rgba(255, 255, 255, 45);
-                border-color: rgba(255, 255, 255, 75);
-            }
-            QPushButton:pressed {
-                background-color: rgba(255, 255, 255, 70);
-            }
-            QSlider::groove:horizontal {
-                height: 4px;
-                background: rgba(255, 255, 255, 40);
-                border-radius: 2px;
-            }
-            QSlider::sub-page:horizontal {
-                background: #1DB954;
-                border-radius: 2px;
-            }
-            QSlider::handle:horizontal {
-                background: #FFFFFF;
-                width: 10px;
-                margin-top: -3px;
-                margin-bottom: -3px;
-                border-radius: 5px;
-            }
-        """)
+        self._apply_container_style()
 
         container_layout = QVBoxLayout(self.container)
         container_layout.setContentsMargins(14, 10, 14, 10)
@@ -299,6 +308,11 @@ class LyricsWindow(QWidget):
         self.btn_add_offset.setToolTip("Increase offset by 0.5s")
         self.btn_add_offset.clicked.connect(lambda: self.adjust_offset(500))
         header_layout.addWidget(self.btn_add_offset)
+
+        self.btn_bg_mode = QPushButton("🎨 Clear" if self._transparent_bg else "🎨 Glass", self.header_bar)
+        self.btn_bg_mode.setToolTip("Toggle Transparent Background (Text Only) (Ctrl+B)")
+        self.btn_bg_mode.clicked.connect(lambda: self.set_transparent_background(not self._transparent_bg))
+        header_layout.addWidget(self.btn_bg_mode)
 
         self.btn_lock = QPushButton("🔒 Lock", self.header_bar)
         self.btn_lock.setToolTip("Lock click-through mode (Ctrl+L)")
@@ -357,6 +371,12 @@ class LyricsWindow(QWidget):
         self.action_reset_offset.triggered.connect(self.reset_offset)
         tray_menu.addAction(self.action_reset_offset)
 
+        self.action_transparent_bg = QAction("Transparent Background (Text Only)", self)
+        self.action_transparent_bg.setCheckable(True)
+        self.action_transparent_bg.setChecked(self._transparent_bg)
+        self.action_transparent_bg.triggered.connect(self.set_transparent_background)
+        tray_menu.addAction(self.action_transparent_bg)
+
         tray_menu.addSeparator()
 
         self.action_quit = QAction("Quit", self)
@@ -370,6 +390,8 @@ class LyricsWindow(QWidget):
     def _init_shortcuts(self) -> None:
         self.lock_shortcut = QShortcut(QKeySequence("Ctrl+L"), self)
         self.lock_shortcut.activated.connect(lambda: self.toggle_lock())
+        self.bg_shortcut = QShortcut(QKeySequence("Ctrl+B"), self)
+        self.bg_shortcut.activated.connect(lambda: self.set_transparent_background(not self._transparent_bg))
         self.sub_offset_shortcut = QShortcut(QKeySequence("["), self)
         self.sub_offset_shortcut.activated.connect(lambda: self.adjust_offset(-500))
         self.add_offset_shortcut = QShortcut(QKeySequence("]"), self)
@@ -384,6 +406,9 @@ class LyricsWindow(QWidget):
 
     def resizeEvent(self, event) -> None:
         super().resizeEvent(event)
+        if hasattr(self, "lyrics_display"):
+            self.lyrics_display.update_font_sizes(self.width(), self.height())
+            self.lyrics_display.update()
         if hasattr(self, "size_grip"):
             self.size_grip.move(
                 self.width() - self.size_grip.width() - 4,
@@ -475,6 +500,59 @@ class LyricsWindow(QWidget):
             self.btn_lock.setText("🔒 Lock")
             self._show_header()
 
+    # Transparent background toggle
+    def _apply_container_style(self) -> None:
+        if getattr(self, "_transparent_bg", False):
+            bg_css = "background-color: transparent; border: none;"
+        else:
+            bg_css = "background-color: rgba(18, 18, 18, 210); border: 1px solid rgba(255, 255, 255, 30); border-radius: 12px;"
+
+        self.container.setStyleSheet(f"""
+            #container {{
+                {bg_css}
+            }}
+            QPushButton {{
+                background-color: rgba(255, 255, 255, 25);
+                border: 1px solid rgba(255, 255, 255, 45);
+                border-radius: 4px;
+                color: #FFFFFF;
+                font-size: 11px;
+                font-weight: 500;
+                padding: 2px 7px;
+            }}
+            QPushButton:hover {{
+                background-color: rgba(255, 255, 255, 45);
+                border-color: rgba(255, 255, 255, 75);
+            }}
+            QPushButton:pressed {{
+                background-color: rgba(255, 255, 255, 70);
+            }}
+            QSlider::groove:horizontal {{
+                height: 4px;
+                background: rgba(255, 255, 255, 40);
+                border-radius: 2px;
+            }}
+            QSlider::sub-page:horizontal {{
+                background: #1DB954;
+                border-radius: 2px;
+            }}
+            QSlider::handle:horizontal {{
+                background: #FFFFFF;
+                width: 10px;
+                margin-top: -3px;
+                margin-bottom: -3px;
+                border-radius: 5px;
+            }}
+        """)
+
+    def set_transparent_background(self, enabled: bool) -> None:
+        self._transparent_bg = bool(enabled)
+        self._apply_container_style()
+        if hasattr(self, "btn_bg_mode"):
+            self.btn_bg_mode.setText("🎨 Clear" if self._transparent_bg else "🎨 Glass")
+        if hasattr(self, "action_transparent_bg"):
+            self.action_transparent_bg.setChecked(self._transparent_bg)
+
     # Always-on-top toggle
     def toggle_always_on_top(self, enabled: bool | None = None) -> None:
         if enabled is None:
@@ -512,13 +590,16 @@ class LyricsWindow(QWidget):
 
         if self.parser and len(self.parser.lines) > 0:
             active_idx = self.parser.get_line_index_at(self._current_time, self._manual_offset_ms)
-            line_height = max(34.0, min(44.0, self.lyrics_display.height() / 6.0))
+            heights, y_positions = self.lyrics_display.compute_layout()
 
             if active_idx != self._active_idx:
                 self._active_idx = active_idx
                 self.lyrics_display.active_idx = active_idx
-                target_idx = max(0, active_idx) if active_idx >= 0 else 0
-                self._target_scroll_y = target_idx * line_height
+
+            if 0 <= active_idx < len(y_positions):
+                self._target_scroll_y = y_positions[active_idx] + heights[active_idx] / 2.0
+            elif y_positions:
+                self._target_scroll_y = y_positions[0] + heights[0] / 2.0
 
             # Smooth exponential ease-out scrolling
             diff = self._target_scroll_y - self._current_scroll_y
