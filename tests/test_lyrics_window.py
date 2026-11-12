@@ -182,3 +182,22 @@ def test_adaptive_font_sizing_on_resize(qapp):
     assert large_active > small_active
     win.close()
 
+
+def test_line_change_layout_invariance(qapp):
+    win = LyricsWindow()
+    win.load_lyrics_direct(SAMPLE_LRC, title="Test", artist="Test")
+    win.resize(600, 240)
+
+    # When line 0 is active
+    win.lyrics_display.active_idx = 0
+    heights_0, y_pos_0 = win.lyrics_display.compute_layout()
+
+    # When line 1 is active
+    win.lyrics_display.active_idx = 1
+    heights_1, y_pos_1 = win.lyrics_display.compute_layout()
+
+    # Layout must be 100% invariant across line changes so text never shifts, jerks, or blinks
+    assert heights_0 == heights_1
+    assert y_pos_0 == y_pos_1
+    win.close()
+

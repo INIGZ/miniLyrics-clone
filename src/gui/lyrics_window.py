@@ -71,11 +71,15 @@ class LyricsDisplay(QWidget):
         self.active_idx: int = -1
         self.scroll_y: float = 0.0
 
-        self.font_active = QFont("Segoe UI", 18, QFont.Bold)
-        self.font_normal = QFont("Segoe UI", 13, QFont.Normal)
+        # Uniform typography across active and inactive lines to prevent coordinate jumps and line pop
+        self.font_active = QFont("Segoe UI", 16, QFont.Bold)
+        self.font_normal = QFont("Segoe UI", 16, QFont.Bold)
         self.color_active = QColor("#1DB954")
-        self.color_prev = QColor(255, 255, 255, 120)
-        self.color_next = QColor(255, 255, 255, 170)
+        self.color_prev = QColor(255, 255, 255, 110)
+        self.color_next = QColor(255, 255, 255, 160)
+
+        self._cached_layout: tuple[list[float], list[float]] | None = None
+        self._cached_w: int = -1
 
         self.setMouseTracking(True)
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
@@ -83,44 +87,54 @@ class LyricsDisplay(QWidget):
     def update_font_sizes(self, w: int, h: int) -> None:
         """Dynamically adapt font sizes based on window dimensions."""
         scale = (w / 680.0) * 0.35 + (h / 240.0) * 0.65
-        normal_pt = max(10, min(30, int(13 * scale)))
-        active_pt = max(13, min(42, int(18 * scale)))
-        if self.font_normal.pointSize() != normal_pt:
-            self.font_normal.setPointSize(normal_pt)
-        if self.font_active.pointSize() != active_pt:
-            self.font_active.setPointSize(active_pt)
+        base_pt = max(11, min(36, int(16 * scale)))
+        changed = False
+        if self.font_normal.pointSize() != base_pt:
+            self.font_normal.setPointSize(base_pt)
+            changed = True
+        if self.font_active.pointSize() != base_pt:
+            self.font_active.setPointSize(base_pt)
+            changed = True
+        if changed:
+            self._cached_layout = None
 
     def compute_layout(self) -> tuple[list[float], list[float]]:
-        """Compute line heights and cumulative top y-offsets for all lines with word wrap."""
+        """Compute line heights and cumulative top y-offsets for all lines with word wrap.
+        Uses stable, invariant layout so coordinates never jump when active line changes."""
         if not self.lines:
             return [], []
 
-        w = max(100.0, float(self.width() - 40))
+        w = int(max(100.0, float(self.width() - 40)))
+        if self._cached_layout is not None and self._cached_w == w and len(self._cached_layout[0]) == len(self.lines):
+            return self._cached_layout
+
+        fm = QFontMetrics(self.font_active)
         heights: list[float] = []
         y_positions: list[float] = []
         cur_y = 0.0
 
-        for i, line in enumerate(self.lines):
-            font = self.font_active if i == self.active_idx else self.font_normal
-            fm = QFontMetrics(font)
+        for line in self.lines:
             text = line.text if line.text else "• • •"
-            br = fm.boundingRect(0, 0, int(w), 10000, Qt.AlignCenter | Qt.TextWordWrap, text)
-            pad = 14.0 if i == self.active_idx else 8.0
-            h_i = max(float(br.height()) + pad, 26.0)
+            br = fm.boundingRect(0, 0, w, 10000, Qt.AlignCenter | Qt.TextWordWrap, text)
+            h_i = max(float(br.height()) + 14.0, 32.0)
             heights.append(h_i)
             y_positions.append(cur_y)
             cur_y += h_i
 
-        return heights, y_positions
+        self._cached_layout = (heights, y_positions)
+        self._cached_w = w
+        return self._cached_layout
 
     def set_lines(self, lines: list[LyricLine], status_text: str = "") -> None:
         self.lines = list(lines)
         self.status_text = status_text
+        self._cached_layout = None
         self.update()
 
     def set_status(self, text: str) -> None:
         self.status_text = text
         self.lines.clear()
+        self._cached_layout = None
         self.update()
 
     def mousePressEvent(self, event) -> None:
@@ -175,6 +189,8 @@ class LyricsDisplay(QWidget):
         heights, y_positions = self.compute_layout()
         content_w = max(100.0, float(w - 40))
 
+        painter.setFont(self.font_active)
+
         for i, line in enumerate(self.lines):
             line_h = heights[i]
             top_y = cy + (y_positions[i] - self.scroll_y)
@@ -184,13 +200,10 @@ class LyricsDisplay(QWidget):
                 continue
 
             if i == self.active_idx:
-                painter.setFont(self.font_active)
                 text_color = self.color_active
             elif i < self.active_idx:
-                painter.setFont(self.font_normal)
                 text_color = self.color_prev
             else:
-                painter.setFont(self.font_normal)
                 text_color = self.color_next
 
             raw_text = line.text if line.text else "• • •"
@@ -592,7 +605,8 @@ class LyricsWindow(QWidget):
             active_idx = self.parser.get_line_index_at(self._current_time, self._manual_offset_ms)
             heights, y_positions = self.lyrics_display.compute_layout()
 
-            if active_idx != self._active_idx:
+            line_changed = (active_idx != self._active_idx)
+            if line_changed:
                 self._active_idx = active_idx
                 self.lyrics_display.active_idx = active_idx
 
@@ -603,13 +617,13 @@ class LyricsWindow(QWidget):
 
             # Smooth exponential ease-out scrolling
             diff = self._target_scroll_y - self._current_scroll_y
-            scrolling = abs(diff) > 0.1
+            scrolling = abs(diff) > 0.05
             if scrolling:
-                self._current_scroll_y += diff * 0.15
+                self._current_scroll_y += diff * 0.12
             else:
                 self._current_scroll_y = self._target_scroll_y
 
-            if scrolling or active_idx != self.lyrics_display.active_idx or abs(self.lyrics_display.scroll_y - self._current_scroll_y) > 0.05:
+            if scrolling or line_changed or abs(self.lyrics_display.scroll_y - self._current_scroll_y) > 0.02:
                 self.lyrics_display.scroll_y = self._current_scroll_y
                 self.lyrics_display.update()
 
