@@ -201,3 +201,45 @@ def test_line_change_layout_invariance(qapp):
     assert y_pos_0 == y_pos_1
     win.close()
 
+
+def test_monotonic_forward_clock_no_oscillation(qapp):
+    win = LyricsWindow()
+    # Line 0 is at 5.00s, Line 1 is at 5.20s
+    lrc = """[00:05.00]Line 0
+[00:05.20]Line 1
+[00:08.00]Line 2
+"""
+    win.load_lyrics_direct(lrc, title="Clock Test", artist="Artist")
+
+    # Spotify reports position 5.0s
+    win.update_playback({
+        "type": "playback_update",
+        "title": "Clock Test",
+        "artist": "Artist",
+        "position": 5.0,
+        "duration": 60.0,
+        "isPaused": False,
+    })
+    win._on_anim_tick()
+    assert win._active_idx == 0
+
+    # Smooth clock advances 250ms forward: 5.0 + 0.25 = 5.25s (Line 1 active)
+    import time
+    win._last_update_monotonic = time.monotonic() - 0.25
+    win._on_anim_tick()
+    assert win._active_idx == 1
+
+    # Spotify sends coarse 5.0s again (because DOM only shows whole seconds)
+    win.update_playback({
+        "type": "playback_update",
+        "title": "Clock Test",
+        "artist": "Artist",
+        "position": 5.0,
+        "duration": 60.0,
+        "isPaused": False,
+    })
+    win._on_anim_tick()
+    # Clock must NOT yank backwards! Line 1 must stay active and not oscillate back to Line 0!
+    assert win._active_idx == 1
+    win.close()
+

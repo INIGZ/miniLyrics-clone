@@ -61,8 +61,27 @@ def create_default_tray_icon() -> QIcon:
     return QIcon(pixmap)
 
 
+def wrap_text_to_lines(fm: QFontMetrics, text: str, max_width: int) -> list[str]:
+    """Break text into word-wrapped lines using font metrics."""
+    if not text:
+        return ["• • •"]
+    words = text.split(" ")
+    lines: list[str] = []
+    cur: list[str] = []
+    for word in words:
+        test = " ".join(cur + [word])
+        if fm.horizontalAdvance(test) <= max_width or not cur:
+            cur.append(word)
+        else:
+            lines.append(" ".join(cur))
+            cur = [word]
+    if cur:
+        lines.append(" ".join(cur))
+    return lines
+
+
 class LyricsDisplay(QWidget):
-    """Custom-painted smooth-scrolling multi-line lyrics display with word-wrap and adaptive font sizing."""
+    """Custom-painted smooth-scrolling multi-line lyrics display with word-wrap and prominent active line."""
 
     def __init__(self, parent: QWidget | None = None) -> None:
         super().__init__(parent)
@@ -71,14 +90,15 @@ class LyricsDisplay(QWidget):
         self.active_idx: int = -1
         self.scroll_y: float = 0.0
 
-        # Uniform typography across active and inactive lines to prevent coordinate jumps and line pop
-        self.font_active = QFont("Segoe UI", 16, QFont.Bold)
-        self.font_normal = QFont("Segoe UI", 16, QFont.Bold)
+        # Visual hierarchy: active line is larger and bolder!
+        self.font_active = QFont("Segoe UI", 18, QFont.Bold)
+        self.font_normal = QFont("Segoe UI", 13, QFont.Normal)
         self.color_active = QColor("#1DB954")
         self.color_prev = QColor(255, 255, 255, 110)
         self.color_next = QColor(255, 255, 255, 160)
 
         self._cached_layout: tuple[list[float], list[float]] | None = None
+        self._cached_sublines: list[list[str]] = []
         self._cached_w: int = -1
 
         self.setMouseTracking(True)
@@ -87,41 +107,47 @@ class LyricsDisplay(QWidget):
     def update_font_sizes(self, w: int, h: int) -> None:
         """Dynamically adapt font sizes based on window dimensions."""
         scale = (w / 680.0) * 0.35 + (h / 240.0) * 0.65
-        base_pt = max(11, min(36, int(16 * scale)))
+        normal_pt = max(10, min(28, int(13 * scale)))
+        active_pt = max(14, min(38, int(18 * scale)))
         changed = False
-        if self.font_normal.pointSize() != base_pt:
-            self.font_normal.setPointSize(base_pt)
+        if self.font_normal.pointSize() != normal_pt:
+            self.font_normal.setPointSize(normal_pt)
             changed = True
-        if self.font_active.pointSize() != base_pt:
-            self.font_active.setPointSize(base_pt)
+        if self.font_active.pointSize() != active_pt:
+            self.font_active.setPointSize(active_pt)
             changed = True
         if changed:
             self._cached_layout = None
 
     def compute_layout(self) -> tuple[list[float], list[float]]:
-        """Compute line heights and cumulative top y-offsets for all lines with word wrap.
-        Uses stable, invariant layout so coordinates never jump when active line changes."""
+        """Compute line heights and cumulative top y-offsets with pre-wrapped sublines.
+        Uses font_active bounds to guarantee slot stability and zero re-wrapping pops."""
         if not self.lines:
+            self._cached_sublines = []
             return [], []
 
         w = int(max(100.0, float(self.width() - 40)))
         if self._cached_layout is not None and self._cached_w == w and len(self._cached_layout[0]) == len(self.lines):
             return self._cached_layout
 
-        fm = QFontMetrics(self.font_active)
+        fm_active = QFontMetrics(self.font_active)
         heights: list[float] = []
         y_positions: list[float] = []
+        all_sublines: list[list[str]] = []
         cur_y = 0.0
 
         for line in self.lines:
-            text = line.text if line.text else "• • •"
-            br = fm.boundingRect(0, 0, w, 10000, Qt.AlignCenter | Qt.TextWordWrap, text)
-            h_i = max(float(br.height()) + 14.0, 32.0)
-            heights.append(h_i)
+            text = line.text.strip() if line.text else "• • •"
+            sublines = wrap_text_to_lines(fm_active, text, w)
+            all_sublines.append(sublines)
+            sub_h = float(fm_active.height())
+            line_h = len(sublines) * (sub_h + 4.0) + 14.0
+            heights.append(line_h)
             y_positions.append(cur_y)
-            cur_y += h_i
+            cur_y += line_h
 
         self._cached_layout = (heights, y_positions)
+        self._cached_sublines = all_sublines
         self._cached_w = w
         return self._cached_layout
 
@@ -129,12 +155,14 @@ class LyricsDisplay(QWidget):
         self.lines = list(lines)
         self.status_text = status_text
         self._cached_layout = None
+        self._cached_sublines = []
         self.update()
 
     def set_status(self, text: str) -> None:
         self.status_text = text
         self.lines.clear()
         self._cached_layout = None
+        self._cached_sublines = []
         self.update()
 
     def mousePressEvent(self, event) -> None:
@@ -187,9 +215,11 @@ class LyricsDisplay(QWidget):
             return
 
         heights, y_positions = self.compute_layout()
+        all_sublines = self._cached_sublines
         content_w = max(100.0, float(w - 40))
 
-        painter.setFont(self.font_active)
+        fm_active = QFontMetrics(self.font_active)
+        fm_normal = QFontMetrics(self.font_normal)
 
         for i, line in enumerate(self.lines):
             line_h = heights[i]
@@ -199,23 +229,31 @@ class LyricsDisplay(QWidget):
             if top_y + line_h < -20 or top_y > h + 20:
                 continue
 
-            if i == self.active_idx:
+            sublines = all_sublines[i] if i < len(all_sublines) else ["• • •"]
+            is_active = (i == self.active_idx)
+
+            if is_active:
+                painter.setFont(self.font_active)
                 text_color = self.color_active
-            elif i < self.active_idx:
-                text_color = self.color_prev
+                step_h = float(fm_active.height()) + 4.0
             else:
-                text_color = self.color_next
+                painter.setFont(self.font_normal)
+                text_color = self.color_prev if i < self.active_idx else self.color_next
+                step_h = float(fm_normal.height()) + 4.0
 
-            raw_text = line.text if line.text else "• • •"
-            rect = QRectF(20, top_y, content_w, line_h)
+            total_sub_h = len(sublines) * step_h
+            start_y = top_y + (line_h - total_sub_h) / 2.0
 
-            # Draw subtle drop shadow for crisp readability over transparent backgrounds
-            painter.setPen(QColor(0, 0, 0, 210))
-            painter.drawText(rect.translated(1.5, 1.5), Qt.AlignCenter | Qt.TextWordWrap, raw_text)
+            for s_idx, s_text in enumerate(sublines):
+                sub_rect = QRectF(20, start_y + s_idx * step_h, content_w, step_h)
 
-            # Draw main text with word wrapping
-            painter.setPen(text_color)
-            painter.drawText(rect, Qt.AlignCenter | Qt.TextWordWrap, raw_text)
+                # Draw drop shadow for crisp readability over any background
+                painter.setPen(QColor(0, 0, 0, 210))
+                painter.drawText(sub_rect.translated(1.5, 1.5), Qt.AlignCenter | Qt.TextSingleLine, s_text)
+
+                # Draw main text
+                painter.setPen(text_color)
+                painter.drawText(sub_rect, Qt.AlignCenter | Qt.TextSingleLine, s_text)
 
 
 class LyricsWindow(QWidget):
@@ -639,9 +677,15 @@ class LyricsWindow(QWidget):
         position = float(payload.get("position", 0.0) or 0.0)
         is_paused = bool(payload.get("isPaused", False))
 
+        now = time.monotonic()
         track_key = (title, artist)
-        if track_key != self._current_track_key:
+        track_changed = (track_key != self._current_track_key)
+
+        if track_changed:
             self._current_track_key = track_key
+            self._playback_pos = position
+            self._current_time = position
+            self._last_update_monotonic = now
             if title:
                 header_text = f"{title} • {artist}" if artist else title
                 self.title_artist_label.setText(header_text)
@@ -653,11 +697,31 @@ class LyricsWindow(QWidget):
                 self.parser = LRCParser()
                 self._active_idx = -1
                 self.lyrics_display.active_idx = -1
+        else:
+            # Same track: prevent coarse Spotify updates (whole seconds) from yanking time backwards
+            if not is_paused and self._playback_pos > 0:
+                delta = position - self._current_time
+                if abs(delta) > 1.5:
+                    # User clicked seekbar (large seek backward or forward)
+                    self._playback_pos = position
+                    self._current_time = position
+                    self._last_update_monotonic = now
+                elif delta >= 0.0:
+                    # Spotify time caught up or moved forward
+                    self._playback_pos = position
+                    self._current_time = position
+                    self._last_update_monotonic = now
+                else:
+                    # delta between -1.5s and 0.0s: coarse integer second lag from DOM.
+                    # Never yank time backwards during continuous playback!
+                    pass
+            else:
+                self._playback_pos = position
+                self._current_time = position
+                self._last_update_monotonic = now
 
-        self._playback_pos = position
         self._duration = duration
         self._is_paused = is_paused
-        self._last_update_monotonic = time.monotonic()
 
     def _fetch_lyrics(self, title: str, artist: str, album: str, duration: float) -> None:
         self.lyrics_display.set_status(f"Searching lyrics for {title}...")

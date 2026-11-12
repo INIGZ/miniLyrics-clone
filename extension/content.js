@@ -127,6 +127,22 @@
     const posElem = document.querySelector('[data-testid="playback-position"]');
     const domPos = posElem ? parseTime(posElem.textContent.trim()) : 0;
 
+    // Check progress bar style transform for sub-second precision
+    const bar = document.querySelector('[data-testid="playback-progressbar"], [data-testid="progress-bar"]');
+    if (bar) {
+      const transformElem = bar.querySelector('[style*="--progress-bar-transform"], [style*="--progress-bar-progress"]');
+      if (transformElem && transformElem.getAttribute("style")) {
+        const match = transformElem.getAttribute("style").match(/--progress-bar-(?:transform|progress):\s*([\d.]+)%/);
+        if (match) {
+          const pct = parseFloat(match[1]);
+          const duration = scrapeDuration(audio);
+          if (duration > 0 && Number.isFinite(pct) && pct >= 0 && pct <= 100) {
+            return Math.round((pct / 100.0) * duration * 100) / 100;
+          }
+        }
+      }
+    }
+
     if (audio && Number.isFinite(audio.currentTime) && audio.currentTime >= 0) {
       if (!posElem || Math.abs(audio.currentTime - domPos) <= 3) {
         return Math.round(audio.currentTime * 10) / 10;
