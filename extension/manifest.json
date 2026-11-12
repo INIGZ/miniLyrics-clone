@@ -1,0 +1,23 @@
+{
+  "manifest_version": 3,
+  "name": "MiniLyrics Spotify Web Player Integration",
+  "version": "1.0.0",
+  "description": "Syncs playback status from Spotify Web Player to MiniLyrics desktop overlay via WebSocket.",
+  "host_permissions": [
+    "*://open.spotify.com/*"
+  ],
+  "content_scripts": [
+    {
+      "matches": [
+        "*://open.spotify.com/*"
+      ],
+      "js": [
+        "content.js"
+      ],
+      "css": [
+        "style.css"
+      ],
+      "run_at": "document_idle"
+    }
+  ]
+}

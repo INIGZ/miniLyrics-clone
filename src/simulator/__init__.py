@@ -1,0 +1,1 @@
+"""MiniLyrics Spotify simulator package."""
