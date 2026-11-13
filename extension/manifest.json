@@ -1,8 +1,8 @@
 {
   "manifest_version": 3,
-  "name": "MiniLyrics Spotify Web Player Integration",
-  "version": "1.0.0",
-  "description": "Syncs playback status from Spotify Web Player to MiniLyrics desktop overlay via WebSocket.",
+  "name": "MiniLyrics Music Integration",
+  "version": "1.1.0",
+  "description": "Syncs playback status from Spotify, YouTube, YouTube Music, and Amazon Music to MiniLyrics desktop overlay via WebSocket.",
   "browser_specific_settings": {
     "gecko": {
       "id": "minilyrics@local",
@@ -10,12 +10,32 @@
     }
   },
   "host_permissions": [
-    "*://open.spotify.com/*"
+    "*://open.spotify.com/*",
+    "*://*.youtube.com/*",
+    "*://music.amazon.com/*",
+    "*://music.amazon.co.uk/*",
+    "*://music.amazon.de/*",
+    "*://music.amazon.es/*",
+    "*://music.amazon.fr/*",
+    "*://music.amazon.it/*",
+    "*://music.amazon.co.jp/*",
+    "*://music.amazon.ca/*",
+    "*://music.amazon.in/*"
   ],
   "content_scripts": [
     {
       "matches": [
-        "*://open.spotify.com/*"
+        "*://open.spotify.com/*",
+        "*://*.youtube.com/*",
+        "*://music.amazon.com/*",
+        "*://music.amazon.co.uk/*",
+        "*://music.amazon.de/*",
+        "*://music.amazon.es/*",
+        "*://music.amazon.fr/*",
+        "*://music.amazon.it/*",
+        "*://music.amazon.co.jp/*",
+        "*://music.amazon.ca/*",
+        "*://music.amazon.in/*"
       ],
       "js": [
         "content.js"

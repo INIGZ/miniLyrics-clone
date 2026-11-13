@@ -392,3 +392,18 @@ def test_font_adjustment_and_color_picker(qapp):
     assert win.lyrics_display.color_active == custom_color
     win.close()
 
+
+def test_no_lyrics_status_timeout_clears_display(qapp):
+    win = LyricsWindow(state_path=False)
+    win._current_track_key = ("Some Podcast", "Host")
+    # Simulate lyrics not found for a podcast or vlog
+    win._on_lyrics_fetched("Some Podcast", "Host", {})
+    assert "No lyrics found" in win.lyrics_display.status_text
+    assert win._status_timeout_timer.isActive()
+
+    # Trigger timeout callback
+    win._on_status_timeout()
+    assert win.lyrics_display.status_text == ""
+    assert len(win.lyrics_display.lines) == 0
+    win.close()
+

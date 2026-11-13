@@ -237,9 +237,14 @@ class LyricsDisplay(QWidget):
         self.update_font_sizes(w, h)
 
         if not self.lines:
+            if not self.status_text:
+                return  # Show nothing when status is cleared (e.g. podcasts, vlogs)
             painter.setFont(self.font_normal)
-            status_text = self.status_text or "Waiting for Spotify playback..."
+            status_text = self.status_text
             status_rect = QRectF(16, 0, w - 32, h)
+            # Soft dark drop shadow
+            painter.setPen(QColor(0, 0, 0, 180))
+            painter.drawText(status_rect.translated(1.5, 1.5), Qt.AlignCenter | Qt.TextWordWrap, status_text)
             painter.setPen(QColor(255, 255, 255, 220))
             painter.drawText(status_rect, Qt.AlignCenter | Qt.TextWordWrap, status_text)
             return
@@ -276,6 +281,9 @@ class LyricsDisplay(QWidget):
 
             for s_idx, s_text in enumerate(sublines):
                 sub_rect = QRectF(20, start_y + s_idx * step_h, content_w, step_h)
+                # Soft dark drop shadow
+                painter.setPen(QColor(0, 0, 0, 180))
+                painter.drawText(sub_rect.translated(1.5, 1.5), Qt.AlignCenter | Qt.TextSingleLine, s_text)
                 painter.setPen(text_color)
                 painter.drawText(sub_rect, Qt.AlignCenter | Qt.TextSingleLine, s_text)
 
@@ -407,6 +415,11 @@ class LyricsWindow(QWidget):
         self._anim_timer.setInterval(30)
         self._anim_timer.timeout.connect(self._on_anim_tick)
         self._anim_timer.start()
+
+        # Timer to clear "No lyrics found" status after timeout for podcasts/vlogs
+        self._status_timeout_timer = QTimer(self)
+        self._status_timeout_timer.setSingleShot(True)
+        self._status_timeout_timer.timeout.connect(self._on_status_timeout)
 
         # Header bar auto-hide timer (header is hidden until focused)
         self._header_timer = QTimer(self)
@@ -1078,7 +1091,13 @@ class LyricsWindow(QWidget):
         self._duration = duration
         self._is_paused = is_paused
 
+    def _on_status_timeout(self) -> None:
+        """Clear status message when no lyrics are found so nothing is shown."""
+        if not self.lyrics_display.lines:
+            self.lyrics_display.set_status("")
+
     def _fetch_lyrics(self, title: str, artist: str, album: str, duration: float) -> None:
+        self._status_timeout_timer.stop()
         self.lyrics_display.set_status(f"Searching lyrics for {title}...")
 
         def worker() -> None:
@@ -1101,6 +1120,7 @@ class LyricsWindow(QWidget):
             return
 
         if data and (data.get("syncedLyrics") or data.get("plainLyrics")):
+            self._status_timeout_timer.stop()
             self.parser = LRCParser(data)
             if len(self.parser.lines) > 0:
                 self.lyrics_display.set_lines(self.parser.lines)
@@ -1115,9 +1135,11 @@ class LyricsWindow(QWidget):
                 )
             else:
                 self.lyrics_display.set_lines([], status_text=f"No lyrics found for {title}")
+                self._status_timeout_timer.start(3500)
         else:
             self.parser = LRCParser()
             self.lyrics_display.set_lines([], status_text=f"No lyrics found for {title}")
+            self._status_timeout_timer.start(3500)
 
         self._active_idx = -1
         self._current_scroll_y = 0.0

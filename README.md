@@ -1,18 +1,20 @@
 # MiniLyrics
 
-A lightweight, modern MiniLyrics clone for Spotify Web Player ([open.spotify.com](https://open.spotify.com)). MiniLyrics displays synchronized, smoothly scrolling lyrics on a sleek, transparent, always-on-top floating desktop overlay powered by PyQt5, LRCLIB, and WebSockets.
+A lightweight, modern MiniLyrics clone for **Spotify Web**, **YouTube**, **YouTube Music**, and **Amazon Music**. MiniLyrics displays synchronized, smoothly scrolling lyrics on a sleek, transparent, always-on-top floating desktop overlay powered by PyQt5, LRCLIB, and WebSockets.
 
 ---
 
 ## Features
 
-- **Remembers Window Position & Size**: Automatically remembers your preferred screen location, dimensions, and background transparency mode across app restarts (`.cache/window_state.json`).
+- **Multi-Service Streaming Integration**: Syncs lyrics and playback in real time from **Spotify Web Player** (`open.spotify.com`), **YouTube Music** (`music.youtube.com`), **YouTube** (`www.youtube.com`), and **Amazon Music** (`music.amazon.*`).
+- **Full Media Playback Control**: Play/Pause, Next Track, Previous Track, and Click-to-Seek directly from the overlay via header buttons (`⏮`, `⏯`, `⏭`), keyboard shortcuts, or tray menu.
+- **Smart Song Detection for YouTube**: Intelligently strips YouTube video title fluff (e.g. `(Official Video)`, `[Lyric Video]`, `HD`, `4K`, `VEVO`) and splits `Artist - Title` to reliably match lyrics on LRCLIB.
+- **Remembers Window Position & Preferences**: Automatically remembers your preferred screen location, dimensions, font scaling offset, and custom active lyric color across app restarts (`.cache/window_state.json`).
 - **Compact & Floating (510×120 Default Size)**: 50% shorter height and 75% width by default for a sleek, unobtrusive desktop strip that floats above all apps.
-- **2-Row Crystal Header Bar (Focus-Revealed)**: In Glass mode, the header is organized into two clean rows (Row 1: Track title & window actions; Row 2: Playback controls & timing offset) with an opaque beveled crystal glass gradient that reveals on focus or hover.
-- **Delicate Hairline Black Font Outline**: Ultra-thin contour border around every lyric character that preserves font elegance while guaranteeing sharp contrast over any background wallpaper.
+- **2-Row Crystal Header Bar**: Organized into two clean rows (Row 1: Track title & window actions; Row 2: Playback controls, font scaling `[A-]`/`[A+]`, color picker `[🎨]`, and timing offset).
+- **Clean Antialiased Typography**: Slender font rendering with customizable active highlight color (Spotify green, gold, purple, cyan, etc.).
 - **Transparent, Borderless, Always-on-Top Desktop Overlay**: Floats unobtrusively above all applications with a translucent dark backdrop, rounded corners, and smooth typography.
-- **Full Playback Control of Spotify Web**: Control Spotify directly from the overlay via header buttons (`⏮`, `⏯`, `⏭`), keyboard shortcuts (`Space`, `Ctrl+Left`, `Ctrl+Right`), or tray menu.
-- **Click-to-Seek Any Verse**: Left-click any lyric line in the window to instantly jump Spotify Web Player playback to that exact timestamp!
+- **Click-to-Seek Any Verse**: Left-click any lyric line in the window to instantly jump web player playback to that exact timestamp!
 - **Transparent Background (Text Only Mode)**: Toggle between sleek dark frosted glass and 100% transparent background (`Ctrl+B` or header `🎨 Clear` button) so *only the lyrics text floats directly on your screen* with a subtle text shadow for readability over any light or dark background.
 - **Full Word-Wrapping Support**: Automatically wraps long lines across multiple lines with dynamic height allocation so lyrics are never truncated or cut off horizontally.
 - **Resizable Window with Adaptive Font Sizing**: Scale the overlay to any size (small widget or large display); font size smoothly adapts to window dimensions automatically.
@@ -107,7 +109,7 @@ python main.py --demo
 
 ## Browser Setup (Mozilla Firefox, Chrome, Edge, Brave)
 
-To sync playback status from Spotify Web Player to the desktop overlay:
+To sync playback status from Spotify, YouTube, YouTube Music, or Amazon Music to the desktop overlay:
 
 ### Mozilla Firefox Users (Recommended: Userscript)
 
@@ -118,13 +120,17 @@ Because Firefox removes temporary unpacked add-ons whenever the browser closes, 
 2. Click the extension toolbar icon and choose **Create a new script** (or **+**).
 3. Paste the full contents of [`extension/minilyrics.user.js`](extension/minilyrics.user.js).
 4. Save (`Ctrl+S`).
-5. Open [open.spotify.com](https://open.spotify.com) — it will automatically connect on every Firefox launch.
+5. Open any supported music player:
+   - Spotify: `open.spotify.com`
+   - YouTube Music: `music.youtube.com`
+   - YouTube: `www.youtube.com`
+   - Amazon Music: `music.amazon.com`
+   It will automatically connect on every Firefox launch.
 
 #### Option B: Firefox Temporary Add-on (about:debugging)
 1. In Firefox address bar, navigate to `about:debugging#/runtime/this-firefox`.
 2. Click **Load Temporary Add-on...**
 3. Select `extension/manifest.json`.
-4. Open [open.spotify.com](https://open.spotify.com).
 
 ---
 
@@ -133,7 +139,7 @@ Because Firefox removes temporary unpacked add-ons whenever the browser closes, 
 1. Open `chrome://extensions` (or `edge://extensions` / `brave://extensions`).
 2. Enable **Developer mode** (top-right toggle).
 3. Click **Load unpacked** (top-left) and choose the `extension/` folder.
-4. Open or refresh [open.spotify.com](https://open.spotify.com).
+4. Open or refresh any supported music website.
 
 ---
 
