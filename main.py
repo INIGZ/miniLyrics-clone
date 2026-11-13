@@ -137,7 +137,7 @@ def main(argv: list[str] | None = None) -> int:
         lrclib_client=client,
         ws_server=server,
         always_on_top=not args.no_top,
-        transparent_bg=args.transparent_bg,
+        transparent_bg=True if args.transparent_bg else None,
     )
 
     server.playback_updated.connect(window.update_playback)

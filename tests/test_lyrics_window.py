@@ -371,3 +371,24 @@ def test_demo_mode_media_controls(qapp):
     runner.timer.stop()
     win.close()
 
+
+def test_font_adjustment_and_color_picker(qapp):
+    win = LyricsWindow(state_path=False)
+    assert win.btn_font_dec is not None
+    assert win.btn_font_inc is not None
+    assert win.btn_color_picker is not None
+
+    # Test font adjust
+    initial_delta = win.lyrics_display.font_delta
+    win.adjust_font_size(1)
+    assert win.lyrics_display.font_delta == initial_delta + 1
+    win.adjust_font_size(-2)
+    assert win.lyrics_display.font_delta == initial_delta - 1
+
+    # Test custom active color
+    from PyQt5.QtGui import QColor
+    custom_color = QColor("#FF5722")
+    win.lyrics_display.set_active_color(custom_color)
+    assert win.lyrics_display.color_active == custom_color
+    win.close()
+

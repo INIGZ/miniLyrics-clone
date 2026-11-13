@@ -26,6 +26,7 @@ from PyQt5.QtGui import (
 from PyQt5.QtWidgets import (
     QAction,
     QApplication,
+    QColorDialog,
     QFrame,
     QHBoxLayout,
     QLabel,
@@ -95,9 +96,10 @@ class LyricsDisplay(QWidget):
         # Visual hierarchy: active line is larger and bolder!
         self.font_active = QFont("Segoe UI", 18, QFont.Bold)
         self.font_normal = QFont("Segoe UI", 13, QFont.Normal)
-        self.color_active = QColor("#1DB954")
+        self.color_active = QColor("#24924B")
         self.color_prev = QColor(255, 255, 255, 110)
         self.color_next = QColor(255, 255, 255, 160)
+        self.font_delta: int = 0
 
         self._cached_layout: tuple[list[float], list[float]] | None = None
         self._cached_sublines: list[list[str]] = []
@@ -107,10 +109,10 @@ class LyricsDisplay(QWidget):
         self.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
     def update_font_sizes(self, w: int, h: int) -> None:
-        """Dynamically adapt font sizes based on window dimensions."""
+        """Dynamically adapt font sizes based on window dimensions and user font_delta."""
         scale = (w / 510.0) * 0.40 + (h / 120.0) * 0.60
-        normal_pt = max(10, min(28, int(13 * scale)))
-        active_pt = max(14, min(38, int(17 * scale)))
+        normal_pt = max(9, min(36, int(13 * scale) + self.font_delta))
+        active_pt = max(12, min(48, int(17 * scale) + self.font_delta))
         changed = False
         if self.font_normal.pointSize() != normal_pt:
             self.font_normal.setPointSize(normal_pt)
@@ -120,6 +122,19 @@ class LyricsDisplay(QWidget):
             changed = True
         if changed:
             self._cached_layout = None
+
+    def adjust_font_size(self, delta: int) -> None:
+        """Adjust user font size offset up or down."""
+        self.font_delta = max(-6, min(14, self.font_delta + delta))
+        self.update_font_sizes(self.width(), self.height())
+        self._cached_layout = None
+        self.update()
+
+    def set_active_color(self, color: QColor) -> None:
+        """Set custom highlight color for active lyric line."""
+        if color.isValid():
+            self.color_active = color
+            self.update()
 
     def compute_layout(self) -> tuple[list[float], list[float]]:
         """Compute line heights and cumulative top y-offsets with pre-wrapped sublines.
@@ -225,10 +240,6 @@ class LyricsDisplay(QWidget):
             painter.setFont(self.font_normal)
             status_text = self.status_text or "Waiting for Spotify playback..."
             status_rect = QRectF(16, 0, w - 32, h)
-            # Thin hairline outline around status text
-            painter.setPen(QColor(0, 0, 0, 220))
-            for dx, dy in ((-0.75, 0), (0.75, 0), (0, -0.75), (0, 0.75)):
-                painter.drawText(status_rect.translated(dx, dy), Qt.AlignCenter | Qt.TextWordWrap, status_text)
             painter.setPen(QColor(255, 255, 255, 220))
             painter.drawText(status_rect, Qt.AlignCenter | Qt.TextWordWrap, status_text)
             return
@@ -265,13 +276,6 @@ class LyricsDisplay(QWidget):
 
             for s_idx, s_text in enumerate(sublines):
                 sub_rect = QRectF(20, start_y + s_idx * step_h, content_w, step_h)
-
-                # Draw thin hairline black outline around glyphs
-                painter.setPen(QColor(0, 0, 0, 220))
-                for dx, dy in ((-0.75, 0), (0.75, 0), (0, -0.75), (0, 0.75)):
-                    painter.drawText(sub_rect.translated(dx, dy), Qt.AlignCenter | Qt.TextSingleLine, s_text)
-
-                # Draw main text in center
                 painter.setPen(text_color)
                 painter.drawText(sub_rect, Qt.AlignCenter | Qt.TextSingleLine, s_text)
 
@@ -349,7 +353,7 @@ class LyricsWindow(QWidget):
         lrclib_client: LRCLibClient | None = None,
         ws_server: Any = None,
         always_on_top: bool = True,
-        transparent_bg: bool = False,
+        transparent_bg: bool | None = None,
         state_path: Path | bool | None = None,
         parent: QWidget | None = None,
     ) -> None:
@@ -357,7 +361,8 @@ class LyricsWindow(QWidget):
         self.lrclib_client = lrclib_client or LRCLibClient()
         self.ws_server = ws_server
         self._always_on_top = always_on_top
-        self._transparent_bg = transparent_bg
+        self._explicit_transparent_bg = transparent_bg
+        self._transparent_bg = bool(transparent_bg) if transparent_bg is not None else False
         self.state_path = Path(".cache/window_state.json") if state_path is None else (state_path if isinstance(state_path, Path) else None)
         self._is_locked = False
         self._drag_pos: QPoint | None = None
@@ -495,6 +500,26 @@ class LyricsWindow(QWidget):
         self.btn_next.clicked.connect(lambda: self.send_command("next"))
         row2.addWidget(self.btn_next)
 
+        # Font size adjustment buttons
+        self.btn_font_dec = QPushButton("A-", self.header_bar)
+        self.btn_font_dec.setToolTip("Decrease Font Size (Ctrl+-)")
+        self.btn_font_dec.setFixedWidth(26)
+        self.btn_font_dec.clicked.connect(lambda: self.adjust_font_size(-1))
+        row2.addWidget(self.btn_font_dec)
+
+        self.btn_font_inc = QPushButton("A+", self.header_bar)
+        self.btn_font_inc.setToolTip("Increase Font Size (Ctrl++)")
+        self.btn_font_inc.setFixedWidth(26)
+        self.btn_font_inc.clicked.connect(lambda: self.adjust_font_size(1))
+        row2.addWidget(self.btn_font_inc)
+
+        # Color picker button
+        self.btn_color_picker = QPushButton("🎨", self.header_bar)
+        self.btn_color_picker.setToolTip("Pick Active Lyric Color")
+        self.btn_color_picker.setFixedWidth(26)
+        self.btn_color_picker.clicked.connect(self.choose_color)
+        row2.addWidget(self.btn_color_picker)
+
         row2.addStretch(1)
 
         self.offset_label = QLabel("[Offset: +0.0s]", self.header_bar)
@@ -606,6 +631,10 @@ class LyricsWindow(QWidget):
         self.next_shortcut.activated.connect(lambda: self.send_command("next"))
         self.prev_shortcut = QShortcut(QKeySequence("Ctrl+Left"), self)
         self.prev_shortcut.activated.connect(lambda: self.send_command("prev"))
+        self.font_inc_shortcut = QShortcut(QKeySequence("Ctrl+="), self)
+        self.font_inc_shortcut.activated.connect(lambda: self.adjust_font_size(1))
+        self.font_dec_shortcut = QShortcut(QKeySequence("Ctrl+-"), self)
+        self.font_dec_shortcut.activated.connect(lambda: self.adjust_font_size(-1))
         self.quit_shortcut = QShortcut(QKeySequence("Ctrl+Q"), self)
         self.quit_shortcut.activated.connect(self.quit_app)
         self.sub_offset_shortcut = QShortcut(QKeySequence("["), self)
@@ -662,8 +691,14 @@ class LyricsWindow(QWidget):
             if isinstance(x, (int, float)) and isinstance(y, (int, float)):
                 self.move(int(x), int(y))
 
-            if "transparent_bg" in state and not self._transparent_bg:
+            if self._explicit_transparent_bg is None and "transparent_bg" in state:
                 self._transparent_bg = bool(state["transparent_bg"])
+
+            if "font_delta" in state and hasattr(self, "lyrics_display"):
+                self.lyrics_display.font_delta = int(state["font_delta"])
+                self.lyrics_display.update_font_sizes(self.width(), self.height())
+            if "active_color" in state and hasattr(self, "lyrics_display"):
+                self.lyrics_display.set_active_color(QColor(str(state["active_color"])))
         except Exception as e:
             logger.debug("Failed to restore window state: %s", e)
 
@@ -679,6 +714,8 @@ class LyricsWindow(QWidget):
                     "width": self.width(),
                     "height": self.height(),
                     "transparent_bg": self._transparent_bg,
+                    "font_delta": getattr(self.lyrics_display, "font_delta", 0),
+                    "active_color": self.lyrics_display.color_active.name() if hasattr(self, "lyrics_display") else "#24924B",
                 }
                 with open(self.state_path, "w", encoding="utf-8") as f:
                     json.dump(state, f, indent=2)
@@ -869,6 +906,20 @@ class LyricsWindow(QWidget):
         self.offset_label.setText(f"[Offset: {sign}{secs:.1f}s]")
 
     # Bubble collapse & expand
+    def adjust_font_size(self, delta: int) -> None:
+        """Adjust lyric font size and persist preference."""
+        if hasattr(self, "lyrics_display"):
+            self.lyrics_display.adjust_font_size(delta)
+            self._save_geometry_state()
+
+    def choose_color(self) -> None:
+        """Open color dialog to pick active lyric highlight color."""
+        current_color = self.lyrics_display.color_active if hasattr(self, "lyrics_display") else QColor("#24924B")
+        chosen = QColorDialog.getColor(current_color, self, "Select Active Lyric Color")
+        if chosen.isValid():
+            self.lyrics_display.set_active_color(chosen)
+            self._save_geometry_state()
+
     def send_command(self, action: str, **kwargs: Any) -> None:
         """Send a playback control command (play_pause, next, prev, seek) to Spotify Web or demo runner."""
         logger.info("Executing playback command: %s %s", action, kwargs)

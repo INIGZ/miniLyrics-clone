@@ -161,6 +161,9 @@ python -m src.simulator.mock_spotify --test
 | **Play / Pause** | `Space` / Header `⏯` | Toggles play/pause in Spotify Web Player. |
 | **Next Track** | `Ctrl + Right` / Header `⏭` | Skips to the next track in Spotify Web Player. |
 | **Previous Track** | `Ctrl + Left` / Header `⏮` | Returns to the previous track in Spotify Web Player. |
+| **Increase Font** | `Ctrl + =` / Header `A+` | Enlarges lyrics font size (persisted across sessions). |
+| **Decrease Font** | `Ctrl + -` / Header `A-` | Reduces lyrics font size (persisted across sessions). |
+| **Color Picker** | Header `🎨` palette | Opens color dialog to choose custom active lyric highlight color. |
 | **Click-to-Seek** | Click any lyric line | Jumps Spotify playback directly to the clicked lyric timestamp. |
 | **Collapse to Bubble** | `Ctrl + M` / Header `🫧` | Collapses overlay into a compact floating bubble. Click bubble or press `Ctrl+M` to expand. |
 | **Minimize to Tray** | `Ctrl + N` / Header `—` | Hides window to the system tray. Click the tray icon to restore. |
@@ -178,7 +181,7 @@ python -m src.simulator.mock_spotify --test
 
 ## Testing
 
-Run the automated pytest suite (49 unit tests covering parsing, caching, GUI state, window persistence, crystal header, bubble collapse, and bidirectional WebSockets):
+Run the automated pytest suite (51 unit tests covering parsing, caching, GUI state, font scaling, color picker, and WebSockets):
 
 ```bash
 pytest -v
